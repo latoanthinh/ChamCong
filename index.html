@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sổ Chấm Công Cá Nhân</title>
+
+    <!-- Thư viện thông báo SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --warning: #f59e0b;
+            --warning-hover: #d97706;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 12px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            height: fit-content;
+        }
+
+        h2 {
+            text-align: center;
+            color: var(--primary);
+            margin-bottom: 20px;
+            font-size: 1.35rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+        }
+
+        .card {
+            background: #ffffff;
+            padding: 16px;
+            border-radius: 14px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+        }
+
+        .form-group {
+            margin-bottom: 14px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1.5px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 1rem;
+            outline: none;
+            background: #f8fafc;
+            color: var(--text-main);
+            transition: all 0.2s ease;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: var(--primary);
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        button {
+            width: 100%;
+            padding: 13px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+        }
+
+        button.is-leave {
+            background: var(--danger);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+        }
+
+        button.is-leave:hover {
+            background: var(--danger-hover);
+        }
+
+        .btn-secondary {
+            background: #0ea5e9;
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: #0284c7;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-danger:hover {
+            background: var(--danger-hover);
+        }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .history-title {
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: var(--text-main);
+            font-size: 0.95rem;
+        }
+
+        .list {
+            max-height: 280px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .list::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .list::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            background: #f8fafc;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .item-date {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-main);
+        }
+
+        .item-time {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 3px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .time-badge {
+            background: #e2e8f0;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .item-status {
+            font-size: 0.7rem;
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .status-lam {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .status-trễ {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .status-nghi {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: loading 1.4s ease infinite;
+            border-radius: 8px;
+            height: 50px;
+            margin-bottom: 8px;
+        }
+
+        @keyframes loading {
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        #print-section {
+            display: none;
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+
+            #print-section,
+            #print-section * {
+                visibility: visible;
+            }
+
+            #print-section {
+                display: block;
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 20px;
+                color: #000;
+                background: #fff;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h2>📅 Sổ Chấm Công Cá Nhân</h2>
+
+        <div class="card">
+            <div class="form-group">
+                <label for="date">Ngày Chấm Công (Hôm nay)</label>
+                <input type="date" id="date" readonly style="background-color: #e2e8f0; cursor: not-allowed;">
+            </div>
+
+            <div class="form-group">
+                <label for="status">Trạng Thái</label>
+                <select id="status" onchange="updateButtonState()">
+                    <option value="Đi làm">Đi làm</option>
+                    <option value="Nghỉ phép">Nghỉ phép</option>
+                    <option value="Nghỉ không lương">Nghỉ không lương</option>
+                </select>
+            </div>
+
+            <button id="saveBtn" onclick="saveAttendance()">
+                <div class="spinner" id="btnSpinner"></div>
+                <span id="btnText">Ghi Nhận Giờ Công</span>
+            </button>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn-secondary" onclick="openReportModal()">📊 Thống Kê & In Ngày Công</button>
+            <button class="btn-danger" onclick="confirmClearData()">🗑️ Xóa Toàn Bộ Dữ Liệu CSDL</button>
+        </div>
+
+        <div class="history-title">Lịch sử gần đây</div>
+        <div class="list" id="attendanceList">
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+        </div>
+    </div>
+
+    <!-- KHUNG BẢNG CHI TIẾT DÙNG ĐỂ IN BÁO CÁO -->
+    <div id="print-section">
+        <h2 style="text-align: center; margin-bottom: 5px; color: #000;">BÁO CÁO CHI TIẾT NGÀY CÔNG</h2>
+        <p id="print-date-range" style="text-align: center; font-size: 13px; margin-bottom: 20px; color: #555;"></p>
+
+        <div id="print-summary-box" style="margin-bottom: 20px; font-size: 14px; line-height: 1.5;"></div>
+
+        <h3 style="font-size: 15px; margin-bottom: 8px; border-bottom: 2px solid #000; padding-bottom: 4px;">Chi Tiết
+            Lịch Sử Chấm Công</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+            <thead>
+                <tr style="background-color: #f1f5f9; border-bottom: 1.5px solid #000;">
+                    <th style="padding: 8px; border: 1px solid #cbd5e1;">STT</th>
+                    <th style="padding: 8px; border: 1px solid #cbd5e1;">Ngày</th>
+                    <th style="padding: 8px; border: 1px solid #cbd5e1;">Trạng Thái</th>
+                    <th style="padding: 8px; border: 1px solid #cbd5e1;">Giờ Vào</th>
+                    <th style="padding: 8px; border: 1px solid #cbd5e1;">Giờ Ra</th>
+                </tr>
+            </thead>
+            <tbody id="print-table-body"></tbody>
+        </table>
+    </div>
+
+    <!-- Firebase SDKs & Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, updateDoc, doc, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCj1poSyx9DNXgeA27BP4-M-F1KV5ETFRI",
+            authDomain: "chamcong-19c27.firebaseapp.com",
+            projectId: "chamcong-19c27",
+            storageBucket: "chamcong-19c27.firebasestorage.app",
+            messagingSenderId: "649644002364",
+            appId: "1:649644002364:web:b7b3e9feb2789ee7880739",
+            measurementId: "G-FGLZF738T0"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const analytics = getAnalytics(app);
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const dateInput = document.getElementById('date');
+        dateInput.value = todayStr;
+        dateInput.max = todayStr;
+        dateInput.min = todayStr;
+
+        let globalAttendanceData = [];
+        let todayExistingRecord = null;
+
+        window.updateButtonState = function () {
+            const statusVal = document.getElementById('status').value;
+            const btn = document.getElementById('saveBtn');
+            const btnText = document.getElementById('btnText');
+
+            if (statusVal.includes('Nghỉ')) {
+                btn.classList.add('is-leave');
+                btnText.textContent = 'Ghi Nhận Ngày Nghỉ';
+            } else {
+                btn.classList.remove('is-leave');
+                btnText.textContent = 'Ghi Nhận Giờ Công';
+            }
+        }
+
+        window.saveAttendance = async function () {
+            const date = dateInput.value;
+            let status = document.getElementById('status').value;
+
+            if (!date || date !== todayStr) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Chỉ được phép chấm công hôm nay!',
+                    confirmButtonColor: '#4f46e5'
+                });
+                return;
+            }
+
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+            const currentTime = String(currentHour).padStart(2, '0') + ':' + String(currentMinute).padStart(2, '0');
+
+            // Kiểm tra khung giờ sau 12:00 trưa (chỉ được chấm giờ ra)
+            const isAfterNoon = currentHour >= 12;
+
+            if (isAfterNoon && !todayExistingRecord && !status.includes('Nghỉ')) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Đã qua 12:00 trưa!',
+                    text: 'Đã quá giờ chấm công vào. Bạn chỉ có thể chấm công ra hoặc báo nghỉ.',
+                    confirmButtonColor: '#f59e0b'
+                });
+                return;
+            }
+
+            // Xác định đi trễ nếu sau 08:01 (và chọn đi làm)
+            const isLate = (currentHour > 8) || (currentHour === 8 && currentMinute >= 1);
+            if (!status.includes('Nghỉ') && isLate) {
+                status = 'Đi trễ';
+            }
+
+            // Chặn đổi trạng thái trái phép giữa Đi làm/Đi trễ và Nghỉ trong ngày
+            if (todayExistingRecord) {
+                const oldStatusIsLeave = todayExistingRecord.status.includes('Nghỉ');
+                const newStatusIsLeave = status.includes('Nghỉ');
+
+                if (oldStatusIsLeave !== newStatusIsLeave) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Không thể thay đổi trạng thái!',
+                        text: `Hôm nay bạn đã chốt trạng thái là "${todayExistingRecord.status}". Không thể chuyển đổi qua lại giữa Đi làm/Trễ và Nghỉ phép.`,
+                        confirmButtonColor: '#ef4444'
+                    });
+                    return;
+                }
+            }
+
+            const btn = document.getElementById('saveBtn');
+            const spinner = document.getElementById('btnSpinner');
+            const btnText = document.getElementById('btnText');
+
+            btn.disabled = true;
+            spinner.style.display = 'block';
+            btnText.textContent = 'Đang xử lý...';
+
+            try {
+                const querySnapshot = await getDocs(collection(db, "chamcong"));
+                let targetDocId = null;
+
+                querySnapshot.forEach((d) => {
+                    if (d.data().date === date) {
+                        targetDocId = d.id;
+                    }
+                });
+
+                const newStatusIsLeave = status.includes('Nghỉ');
+
+                if (newStatusIsLeave) {
+                    if (targetDocId) {
+                        await updateDoc(doc(db, "chamcong", targetDocId), {
+                            status: status,
+                            checkIn: "Nghỉ",
+                            checkOut: "Nghỉ"
+                        });
+                    } else {
+                        await addDoc(collection(db, "chamcong"), {
+                            date: date,
+                            status: status,
+                            checkIn: "Nghỉ",
+                            checkOut: "Nghỉ"
+                        });
+                    }
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Đã lưu ngày nghỉ!',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                } else {
+                    if (targetDocId) {
+                        // Đã có bản ghi -> Cập nhật Giờ Ra
+                        await updateDoc(doc(db, "chamcong", targetDocId), {
+                            checkOut: currentTime,
+                            status: todayExistingRecord.status === 'Đi trễ' ? 'Đi trễ' : status // Giữ nguyên trạng thái đi trễ nếu lúc vào đã trễ
+                        });
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Cập nhật Giờ Ra thành công!',
+                            text: `Lúc ${currentTime}`,
+                            timer: 1500,
+                            showConfirmButton: false
+                        });
+                    } else {
+                        // Chưa có bản ghi -> Ghi nhận Giờ Vào
+                        await addDoc(collection(db, "chamcong"), {
+                            date: date,
+                            status: status, // "Đi làm" hoặc "Đi trễ"
+                            checkIn: currentTime,
+                            checkOut: "Chưa chấm"
+                        });
+
+                        let successTitle = status === 'Đi trễ' ? 'Ghi nhận: ĐI TRỄ!' : 'Ghi nhận Giờ Vào thành công!';
+                        let iconType = status === 'Đi trễ' ? 'warning' : 'success';
+
+                        Swal.fire({
+                            icon: iconType,
+                            title: successTitle,
+                            text: `Lúc ${currentTime}`,
+                            timer: 1800,
+                            showConfirmButton: false
+                        });
+                    }
+                }
+
+                await loadAttendance();
+            } catch (e) {
+                console.error(e);
+                Swal.fire('Lỗi', 'Không thể lưu dữ liệu.', 'error');
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+                updateButtonState();
+            }
+        };
+
+        async function loadAttendance() {
+            const listDiv = document.getElementById('attendanceList');
+
+            try {
+                const querySnapshot = await getDocs(collection(db, "chamcong"));
+
+                listDiv.innerHTML = '';
+                globalAttendanceData = [];
+                todayExistingRecord = null;
+
+                if (querySnapshot.empty) {
+                    listDiv.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px; font-size: 0.9rem;">Chưa có dữ liệu chấm công.</p>';
+                    return;
+                }
+
+                querySnapshot.forEach((documentSnap) => {
+                    const data = documentSnap.data();
+                    globalAttendanceData.push(data);
+
+                    if (data.date === todayStr) {
+                        todayExistingRecord = data;
+                    }
+                });
+
+                globalAttendanceData.sort((a, b) => b.date.localeCompare(a.date));
+
+                globalAttendanceData.forEach((data) => {
+                    const isLeave = data.status.includes('Nghỉ');
+                    const isLate = data.status === 'Đi trễ';
+
+                    let statusClass = 'status-lam';
+                    if (isLeave) statusClass = 'status-nghi';
+                    else if (isLate) statusClass = 'status-trễ';
+
+                    let timeHtml = '';
+                    if (isLeave) {
+                        timeHtml = `<span>Trạng thái: <strong class="time-badge">${data.status}</strong></span>`;
+                    } else {
+                        timeHtml = `
+            <span>Vào: <strong class="time-badge">${data.checkIn || 'Chưa chấm'}</strong></span>
+            <span>Ra: <strong class="time-badge">${data.checkOut || 'Chưa chấm'}</strong></span>
+          `;
+                    }
+
+                    const itemHtml = `
+          <div class="item">
+            <div>
+              <div class="item-date">📅 ${data.date}</div>
+              <div class="item-time">${timeHtml}</div>
+            </div>
+            <span class="item-status ${statusClass}">${data.status}</span>
+          </div>
+        `;
+                    listDiv.innerHTML += itemHtml;
+                });
+
+                if (todayExistingRecord) {
+                    const statusSelect = document.getElementById('status');
+                    if (!todayExistingRecord.status.includes('Nghỉ')) {
+                        statusSelect.value = 'Đi làm';
+                    } else {
+                        statusSelect.value = todayExistingRecord.status;
+                    }
+                    updateButtonState();
+                }
+
+                preparePrintData();
+            } catch (e) {
+                console.error(e);
+                listDiv.innerHTML = '<p style="text-align: center; color: #ef4444; padding: 20px; font-size: 0.9rem;">Không thể tải dữ liệu.</p>';
+            }
+        }
+
+        function preparePrintData() {
+            let totalWorkDays = 0;
+            let leaveDetails = [];
+            let missingCheckLogs = [];
+
+            let tableRows = '';
+            const sortedData = [...globalAttendanceData].sort((a, b) => a.date.localeCompare(b.date));
+
+            sortedData.forEach((item, index) => {
+                if (item.status === 'Đi làm' || item.status === 'Đi trễ') {
+                    totalWorkDays++;
+                } else {
+                    leaveDetails.push(`${item.date} (${item.status})`);
+                }
+
+                if ((item.status === 'Đi làm' || item.status === 'Đi trễ') && (!item.checkIn || item.checkIn === 'Chưa chấm' || !item.checkOut || item.checkOut === 'Chưa chấm')) {
+                    missingCheckLogs.push(`${item.date} (Vào: ${item.checkIn || 'Thiếu'}, Ra: ${item.checkOut || 'Thiếu'})`);
+                }
+
+                tableRows += `
+        <tr style="border-bottom: 1px solid #cbd5e1;">
+          <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">${index + 1}</td>
+          <td style="padding: 6px 8px; border: 1px solid #cbd5e1;">${item.date}</td>
+          <td style="padding: 6px 8px; border: 1px solid #cbd5e1;">${item.status}</td>
+          <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">${item.checkIn || '--:--'}</td>
+          <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">${item.checkOut || '--:--'}</td>
+        </tr>
+      `;
+            });
+
+            document.getElementById('print-table-body').innerHTML = tableRows;
+
+            const printDateRangeElem = document.getElementById('print-date-range');
+            if (sortedData.length > 0) {
+                printDateRangeElem.textContent = `Thời gian báo cáo: Từ ngày ${sortedData[0].date} đến ngày ${sortedData[sortedData.length - 1].date}`;
+            }
+
+            const summaryBox = document.getElementById('print-summary-box');
+            summaryBox.innerHTML = `
+      <p><b>• Tổng số ngày đi làm/trễ:</b> ${totalWorkDays} ngày</p>
+      <p><b>• Danh sách ngày nghỉ:</b> ${leaveDetails.length > 0 ? leaveDetails.join(', ') : 'Không có'}</p>
+      <p><b>• Các ngày quên chấm công (Vào/Ra):</b> ${missingCheckLogs.length > 0 ? missingCheckLogs.join(', ') : 'Không có'}</p>
+    `;
+        }
+
+        window.openReportModal = function () {
+            if (globalAttendanceData.length === 0) {
+                Swal.fire('Trống', 'Chưa có dữ liệu để tổng hợp báo cáo.', 'info');
+                return;
+            }
+
+            let totalWorkDays = 0;
+            let leaveDetails = [];
+            let missingCheckLogs = [];
+
+            globalAttendanceData.forEach(item => {
+                if (item.status === 'Đi làm' || item.status === 'Đi trễ') {
+                    totalWorkDays++;
+                } else {
+                    leaveDetails.push(`• ${item.date}: ${item.status}`);
+                }
+
+                if ((item.status === 'Đi làm' || item.status === 'Đi trễ') && (!item.checkIn || item.checkIn === 'Chưa chấm' || !item.checkOut || item.checkOut === 'Chưa chấm')) {
+                    missingCheckLogs.push(`• Ngày ${item.date} (Vào: ${item.checkIn || 'Thiếu'}, Ra: ${item.checkOut || 'Thiếu'})`);
+                }
+            });
+
+            let htmlContent = `
+      <div style="text-align: left; font-size: 0.95rem; line-height: 1.6;">
+        <p><b>✨ Tổng số ngày đi làm/trễ:</b> ${totalWorkDays} ngày</p>
+        <p><b>🏖️ Danh sách ngày nghỉ:</b></p>
+        <div style="background: #f1f5f9; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; max-height: 100px; overflow-y: auto;">
+          ${leaveDetails.length > 0 ? leaveDetails.join('<br>') : 'Không có ngày nghỉ nào.'}
+        </div>
+        <p><b>⚠️ Quên chấm công (Vào/Ra):</b></p>
+        <div style="background: #fef2f2; color: #b91c1c; padding: 8px 12px; border-radius: 8px; max-height: 100px; overflow-y: auto;">
+          ${missingCheckLogs.length > 0 ? missingCheckLogs.join('<br>') : 'Tuyệt vời! Không có ngày nào bị quên giờ.'}
+        </div>
+      </div>
+    `;
+
+            Swal.fire({
+                title: '📊 Bảng Thống Kê Ngày Công',
+                html: htmlContent,
+                showCancelButton: true,
+                confirmButtonText: '🖨️ In Báo Cáo',
+                cancelButtonText: 'Đóng',
+                confirmButtonColor: '#4f46e5',
+                cancelButtonColor: '#64748b'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.print();
+                }
+            });
+        };
+
+        window.confirmClearData = function () {
+            Swal.fire({
+                title: 'Bạn có chắc chắn muốn xóa?',
+                text: "Hành động này sẽ xóa sạch toàn bộ lịch sử chấm công trên CSDL!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Đồng ý xóa sạch!',
+                cancelButtonText: 'Hủy bỏ'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    try {
+                        const querySnapshot = await getDocs(collection(db, "chamcong"));
+                        const deletePromises = querySnapshot.docs.map(d => deleteDoc(doc(db, "chamcong", d.id)));
+                        await Promise.all(deletePromises);
+
+                        Swal.fire('Đã xóa!', 'Dữ liệu đã được làm sạch.', 'success');
+                        loadAttendance();
+                    } catch (e) {
+                        console.error(e);
+                        Swal.fire('Lỗi', 'Không thể xóa dữ liệu.', 'error');
+                    }
+                }
+            });
+        };
+
+        loadAttendance();
+    </script>
+
+</body>
+
+</html>
