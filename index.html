@@ -145,6 +145,13 @@
             background: var(--danger-hover);
         }
 
+        button:disabled {
+            background: #94a3b8 !important;
+            cursor: not-allowed;
+            box-shadow: none !important;
+            transform: none !important;
+        }
+
         .btn-secondary {
             background: #0ea5e9;
             box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
@@ -249,6 +256,11 @@
         .status-trễ {
             background: #fef3c7;
             color: #d97706;
+        }
+
+        .status-som {
+            background: #e0f2fe;
+            color: #0284c7;
         }
 
         .status-nghi {
@@ -398,12 +410,31 @@
             const btn = document.getElementById('saveBtn');
             const btnText = document.getElementById('btnText');
 
+            // Kiểm tra xem hôm nay đã hoàn tất thao tác chưa để khóa nút
+            if (todayExistingRecord) {
+                if (todayExistingRecord.status.includes('Nghỉ')) {
+                    btn.disabled = true;
+                    btnText.textContent = 'Hôm nay đã ghi nhận nghỉ (1/1)';
+                    return;
+                } else if (todayExistingRecord.checkIn && todayExistingRecord.checkIn !== 'Chưa chấm' &&
+                    todayExistingRecord.checkOut && todayExistingRecord.checkOut !== 'Chưa chấm') {
+                    btn.disabled = true;
+                    btnText.textContent = 'Đã hoàn tất chấm công hôm nay (Vào/Ra)';
+                    return;
+                }
+            }
+
+            btn.disabled = false;
             if (statusVal.includes('Nghỉ')) {
                 btn.classList.add('is-leave');
-                btnText.textContent = 'Ghi Nhận Ngày Nghỉ';
+                btnText.textContent = 'Ghi Nhận Ngày Nghỉ (1 Lần)';
             } else {
                 btn.classList.remove('is-leave');
-                btnText.textContent = 'Ghi Nhận Giờ Công';
+                if (!todayExistingRecord || !todayExistingRecord.checkIn || todayExistingRecord.checkIn === 'Chưa chấm') {
+                    btnText.textContent = 'Chấm Công Vào (Lần 1)';
+                } else {
+                    btnText.textContent = 'Chấm Công Ra (Lần 2)';
+                }
             }
         }
 
@@ -414,7 +445,7 @@
             if (!date || date !== todayStr) {
                 Swal.fire({
                     icon: 'warning',
-                    title: 'Chỉ được phép chấm công hôm nay!',
+                    title: 'Chỉ được phép thao tác hôm nay!',
                     confirmButtonColor: '#4f46e5'
                 });
                 return;
@@ -424,39 +455,113 @@
             const currentHour = now.getHours();
             const currentMinute = now.getMinutes();
             const currentTime = String(currentHour).padStart(2, '0') + ':' + String(currentMinute).padStart(2, '0');
+            const totalCurrentMinutes = currentHour * 60 + currentMinute;
 
-            // Kiểm tra khung giờ sau 12:00 trưa (chỉ được chấm giờ ra)
-            const isAfterNoon = currentHour >= 12;
+            const isLeaveStatus = status.includes('Nghỉ');
 
-            if (isAfterNoon && !todayExistingRecord && !status.includes('Nghỉ')) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Đã qua 12:00 trưa!',
-                    text: 'Đã quá giờ chấm công vào. Bạn chỉ có thể chấm công ra hoặc báo nghỉ.',
-                    confirmButtonColor: '#f59e0b'
-                });
-                return;
-            }
+            let calculatedCheckIn = "";
+            let calculatedCheckOut = "";
+            let finalStatus = status;
 
-            // Xác định đi trễ nếu sau 08:01 (và chọn đi làm)
-            const isLate = (currentHour > 8) || (currentHour === 8 && currentMinute >= 1);
-            if (!status.includes('Nghỉ') && isLate) {
-                status = 'Đi trễ';
-            }
-
-            // Chặn đổi trạng thái trái phép giữa Đi làm/Đi trễ và Nghỉ trong ngày
+            // Kiểm tra trạng thái nếu hôm nay đã tồn tại bản ghi
             if (todayExistingRecord) {
-                const oldStatusIsLeave = todayExistingRecord.status.includes('Nghỉ');
-                const newStatusIsLeave = status.includes('Nghỉ');
+                if (todayExistingRecord.status.includes('Nghỉ')) {
+                    Swal.fire('Thông báo', 'Hôm nay bạn đã thực hiện ghi nhận nghỉ rồi (chỉ được phép 1 lần).', 'warning');
+                    return;
+                }
+                if (todayExistingRecord.checkIn && todayExistingRecord.checkIn !== 'Chưa chấm' &&
+                    todayExistingRecord.checkOut && todayExistingRecord.checkOut !== 'Chưa chấm') {
+                    Swal.fire('Thông báo', 'Bạn đã hoàn tất đủ công vào và công ra trong ngày hôm nay rồi.', 'warning');
+                    return;
+                }
+            }
 
-                if (oldStatusIsLeave !== newStatusIsLeave) {
+            if (isLeaveStatus) {
+                // Kiểm tra giới hạn: nút nghỉ chỉ được thao tác 1 lần và kiểm tra giờ quy định
+                if (totalCurrentMinutes > 8 * 60) {
+                    finalStatus = "Nghỉ không lương";
+                } else {
+                    finalStatus = status;
+                }
+
+                if (totalCurrentMinutes > 12 * 60) {
                     Swal.fire({
-                        icon: 'error',
-                        title: 'Không thể thay đổi trạng thái!',
-                        text: `Hôm nay bạn đã chốt trạng thái là "${todayExistingRecord.status}". Không thể chuyển đổi qua lại giữa Đi làm/Trễ và Nghỉ phép.`,
-                        confirmButtonColor: '#ef4444'
+                        icon: 'warning',
+                        title: 'Quá giờ báo nghỉ!',
+                        text: 'Bạn chỉ có thể thực hiện thao tác này vào ngày mai!',
+                        confirmButtonColor: '#f59e0b'
                     });
                     return;
+                }
+
+                calculatedCheckIn = "Nghỉ";
+                calculatedCheckOut = "Nghỉ";
+            } else {
+                // Logic đi làm chia làm 2 lần rõ rệt (Lần 1: Vào, Lần 2: Ra)
+                if (!todayExistingRecord) {
+                    // --- LẦN 1: CHẤM CÔNG VÀO ---
+                    if (totalCurrentMinutes <= 8 * 60) {
+                        calculatedCheckIn = currentTime;
+                        finalStatus = "Đi làm";
+                    } else if (totalCurrentMinutes > 8 * 60 && totalCurrentMinutes <= 8 * 60 + 30) {
+                        calculatedCheckIn = currentTime;
+                        finalStatus = "Đi trễ";
+                    } else if (totalCurrentMinutes > 8 * 60 + 30 && totalCurrentMinutes <= 12 * 60) {
+                        calculatedCheckIn = "Quên vào";
+                        finalStatus = "Đi làm";
+                    } else if (totalCurrentMinutes > 12 * 60 && totalCurrentMinutes <= 18 * 60 + 35) {
+                        // Trường hợp qua trưa mà chưa chấm vào, hệ thống cho phép chấm gộp hoặc tính vào luôn
+                        calculatedCheckIn = "Quên vào";
+                        let standardOutMinutes = 18 * 60 + 30;
+                        if (totalCurrentMinutes < standardOutMinutes) {
+                            let diffMinutes = standardOutMinutes - totalCurrentMinutes;
+                            if (diffMinutes <= 30) {
+                                calculatedCheckOut = "18:30 (Đã làm tròn)";
+                            } else {
+                                calculatedCheckOut = `${currentTime} (Về sớm ${diffMinutes}p)`;
+                            }
+                            finalStatus = "Về sớm";
+                        } else {
+                            calculatedCheckOut = currentTime;
+                            finalStatus = "Đi làm";
+                        }
+                    } else {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Ngoài khung giờ cho phép!',
+                            confirmButtonColor: '#f59e0b'
+                        });
+                        return;
+                    }
+                } else {
+                    // --- LẦN 2: CHẤM CÔNG RA ---
+                    if (totalCurrentMinutes >= 12 * 60 + 1 && totalCurrentMinutes <= 18 * 60 + 35) {
+                        let standardOutMinutes = 18 * 60 + 30; // 18:30
+
+                        if (totalCurrentMinutes < standardOutMinutes) {
+                            let diffMinutes = standardOutMinutes - totalCurrentMinutes;
+                            if (diffMinutes <= 30) {
+                                calculatedCheckOut = "18:30 (Đã làm tròn)";
+                            } else {
+                                calculatedCheckOut = `${currentTime} (Về sớm ${diffMinutes}p)`;
+                            }
+                            finalStatus = "Về sớm";
+                        } else {
+                            calculatedCheckOut = currentTime;
+                            finalStatus = todayExistingRecord.status;
+                        }
+                    } else if (totalCurrentMinutes > 18 * 60 + 35) {
+                        calculatedCheckOut = currentTime;
+                        finalStatus = todayExistingRecord.status;
+                    } else {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Chưa tới giờ chấm công ra!',
+                            text: 'Chỉ được phép chấm ra sau 12:01 trưa.',
+                            confirmButtonColor: '#f59e0b'
+                        });
+                        return;
+                    }
                 }
             }
 
@@ -478,71 +583,34 @@
                     }
                 });
 
-                const newStatusIsLeave = status.includes('Nghỉ');
-
-                if (newStatusIsLeave) {
-                    if (targetDocId) {
-                        await updateDoc(doc(db, "chamcong", targetDocId), {
-                            status: status,
-                            checkIn: "Nghỉ",
-                            checkOut: "Nghỉ"
-                        });
-                    } else {
-                        await addDoc(collection(db, "chamcong"), {
-                            date: date,
-                            status: status,
-                            checkIn: "Nghỉ",
-                            checkOut: "Nghỉ"
-                        });
-                    }
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Đã lưu ngày nghỉ!',
-                        timer: 1500,
-                        showConfirmButton: false
+                if (targetDocId) {
+                    await updateDoc(doc(db, "chamcong", targetDocId), {
+                        status: finalStatus,
+                        checkIn: isLeaveStatus ? "Nghỉ" : todayExistingRecord.checkIn,
+                        checkOut: isLeaveStatus ? "Nghỉ" : calculatedCheckOut
                     });
                 } else {
-                    if (targetDocId) {
-                        // Đã có bản ghi -> Cập nhật Giờ Ra
-                        await updateDoc(doc(db, "chamcong", targetDocId), {
-                            checkOut: currentTime,
-                            status: todayExistingRecord.status === 'Đi trễ' ? 'Đi trễ' : status // Giữ nguyên trạng thái đi trễ nếu lúc vào đã trễ
-                        });
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Cập nhật Giờ Ra thành công!',
-                            text: `Lúc ${currentTime}`,
-                            timer: 1500,
-                            showConfirmButton: false
-                        });
-                    } else {
-                        // Chưa có bản ghi -> Ghi nhận Giờ Vào
-                        await addDoc(collection(db, "chamcong"), {
-                            date: date,
-                            status: status, // "Đi làm" hoặc "Đi trễ"
-                            checkIn: currentTime,
-                            checkOut: "Chưa chấm"
-                        });
-
-                        let successTitle = status === 'Đi trễ' ? 'Ghi nhận: ĐI TRỄ!' : 'Ghi nhận Giờ Vào thành công!';
-                        let iconType = status === 'Đi trễ' ? 'warning' : 'success';
-
-                        Swal.fire({
-                            icon: iconType,
-                            title: successTitle,
-                            text: `Lúc ${currentTime}`,
-                            timer: 1800,
-                            showConfirmButton: false
-                        });
-                    }
+                    await addDoc(collection(db, "chamcong"), {
+                        date: date,
+                        status: finalStatus,
+                        checkIn: calculatedCheckIn,
+                        checkOut: calculatedCheckOut ? calculatedCheckOut : "Chưa chấm"
+                    });
                 }
+
+                Swal.fire({
+                    icon: isLeaveStatus ? 'info' : (finalStatus === 'Đi trễ' ? 'warning' : 'success'),
+                    title: `Ghi nhận thành công!`,
+                    text: `Trạng thái: ${finalStatus.toUpperCase()}`,
+                    timer: 1800,
+                    showConfirmButton: false
+                });
 
                 await loadAttendance();
             } catch (e) {
                 console.error(e);
                 Swal.fire('Lỗi', 'Không thể lưu dữ liệu.', 'error');
             } finally {
-                btn.disabled = false;
                 spinner.style.display = 'none';
                 updateButtonState();
             }
@@ -560,6 +628,7 @@
 
                 if (querySnapshot.empty) {
                     listDiv.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px; font-size: 0.9rem;">Chưa có dữ liệu chấm công.</p>';
+                    updateButtonState();
                     return;
                 }
 
@@ -577,30 +646,32 @@
                 globalAttendanceData.forEach((data) => {
                     const isLeave = data.status.includes('Nghỉ');
                     const isLate = data.status === 'Đi trễ';
+                    const isEarly = data.status === 'Về sớm';
 
                     let statusClass = 'status-lam';
                     if (isLeave) statusClass = 'status-nghi';
                     else if (isLate) statusClass = 'status-trễ';
+                    else if (isEarly) statusClass = 'status-som';
 
                     let timeHtml = '';
                     if (isLeave) {
                         timeHtml = `<span>Trạng thái: <strong class="time-badge">${data.status}</strong></span>`;
                     } else {
                         timeHtml = `
-            <span>Vào: <strong class="time-badge">${data.checkIn || 'Chưa chấm'}</strong></span>
-            <span>Ra: <strong class="time-badge">${data.checkOut || 'Chưa chấm'}</strong></span>
-          `;
+                            <span>Vào: <strong class="time-badge">${data.checkIn || 'Chưa chấm'}</strong></span>
+                            <span>Ra: <strong class="time-badge">${data.checkOut || 'Chưa chấm'}</strong></span>
+                        `;
                     }
 
                     const itemHtml = `
-          <div class="item">
-            <div>
-              <div class="item-date">📅 ${data.date}</div>
-              <div class="item-time">${timeHtml}</div>
-            </div>
-            <span class="item-status ${statusClass}">${data.status}</span>
-          </div>
-        `;
+                        <div class="item">
+                            <div>
+                                <div class="item-date">📅 ${data.date}</div>
+                                <div class="item-time">${timeHtml}</div>
+                            </div>
+                            <span class="item-status ${statusClass}">${data.status}</span>
+                        </div>
+                    `;
                     listDiv.innerHTML += itemHtml;
                 });
 
@@ -611,9 +682,9 @@
                     } else {
                         statusSelect.value = todayExistingRecord.status;
                     }
-                    updateButtonState();
                 }
 
+                updateButtonState();
                 preparePrintData();
             } catch (e) {
                 console.error(e);
@@ -630,25 +701,25 @@
             const sortedData = [...globalAttendanceData].sort((a, b) => a.date.localeCompare(b.date));
 
             sortedData.forEach((item, index) => {
-                if (item.status === 'Đi làm' || item.status === 'Đi trễ') {
+                if (!item.status.includes('Nghỉ')) {
                     totalWorkDays++;
                 } else {
                     leaveDetails.push(`${item.date} (${item.status})`);
                 }
 
-                if ((item.status === 'Đi làm' || item.status === 'Đi trễ') && (!item.checkIn || item.checkIn === 'Chưa chấm' || !item.checkOut || item.checkOut === 'Chưa chấm')) {
+                if (!item.status.includes('Nghỉ') && (!item.checkIn || item.checkIn === 'Chưa chấm' || !item.checkOut || item.checkOut === 'Chưa chấm')) {
                     missingCheckLogs.push(`${item.date} (Vào: ${item.checkIn || 'Thiếu'}, Ra: ${item.checkOut || 'Thiếu'})`);
                 }
 
                 tableRows += `
-        <tr style="border-bottom: 1px solid #cbd5e1;">
-          <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">${index + 1}</td>
-          <td style="padding: 6px 8px; border: 1px solid #cbd5e1;">${item.date}</td>
-          <td style="padding: 6px 8px; border: 1px solid #cbd5e1;">${item.status}</td>
-          <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">${item.checkIn || '--:--'}</td>
-          <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">${item.checkOut || '--:--'}</td>
-        </tr>
-      `;
+                    <tr style="border-bottom: 1px solid #cbd5e1;">
+                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">${index + 1}</td>
+                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1;">${item.date}</td>
+                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1;">${item.status}</td>
+                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">${item.checkIn || '--:--'}</td>
+                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">${item.checkOut || '--:--'}</td>
+                    </tr>
+                `;
             });
 
             document.getElementById('print-table-body').innerHTML = tableRows;
@@ -660,10 +731,10 @@
 
             const summaryBox = document.getElementById('print-summary-box');
             summaryBox.innerHTML = `
-      <p><b>• Tổng số ngày đi làm/trễ:</b> ${totalWorkDays} ngày</p>
-      <p><b>• Danh sách ngày nghỉ:</b> ${leaveDetails.length > 0 ? leaveDetails.join(', ') : 'Không có'}</p>
-      <p><b>• Các ngày quên chấm công (Vào/Ra):</b> ${missingCheckLogs.length > 0 ? missingCheckLogs.join(', ') : 'Không có'}</p>
-    `;
+                <p><b>• Tổng số ngày công:</b> ${totalWorkDays} ngày</p>
+                <p><b>• Danh sách ngày nghỉ:</b> ${leaveDetails.length > 0 ? leaveDetails.join(', ') : 'Không có'}</p>
+                <p><b>• Các ngày thiếu giờ (Vào/Ra):</b> ${missingCheckLogs.length > 0 ? missingCheckLogs.join(', ') : 'Không có'}</p>
+            `;
         }
 
         window.openReportModal = function () {
@@ -677,30 +748,30 @@
             let missingCheckLogs = [];
 
             globalAttendanceData.forEach(item => {
-                if (item.status === 'Đi làm' || item.status === 'Đi trễ') {
+                if (!item.status.includes('Nghỉ')) {
                     totalWorkDays++;
                 } else {
                     leaveDetails.push(`• ${item.date}: ${item.status}`);
                 }
 
-                if ((item.status === 'Đi làm' || item.status === 'Đi trễ') && (!item.checkIn || item.checkIn === 'Chưa chấm' || !item.checkOut || item.checkOut === 'Chưa chấm')) {
+                if (!item.status.includes('Nghỉ') && (!item.checkIn || item.checkIn === 'Chưa chấm' || !item.checkOut || item.checkOut === 'Chưa chấm')) {
                     missingCheckLogs.push(`• Ngày ${item.date} (Vào: ${item.checkIn || 'Thiếu'}, Ra: ${item.checkOut || 'Thiếu'})`);
                 }
             });
 
             let htmlContent = `
-      <div style="text-align: left; font-size: 0.95rem; line-height: 1.6;">
-        <p><b>✨ Tổng số ngày đi làm/trễ:</b> ${totalWorkDays} ngày</p>
-        <p><b>🏖️ Danh sách ngày nghỉ:</b></p>
-        <div style="background: #f1f5f9; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; max-height: 100px; overflow-y: auto;">
-          ${leaveDetails.length > 0 ? leaveDetails.join('<br>') : 'Không có ngày nghỉ nào.'}
-        </div>
-        <p><b>⚠️ Quên chấm công (Vào/Ra):</b></p>
-        <div style="background: #fef2f2; color: #b91c1c; padding: 8px 12px; border-radius: 8px; max-height: 100px; overflow-y: auto;">
-          ${missingCheckLogs.length > 0 ? missingCheckLogs.join('<br>') : 'Tuyệt vời! Không có ngày nào bị quên giờ.'}
-        </div>
-      </div>
-    `;
+                <div style="text-align: left; font-size: 0.95rem; line-height: 1.6;">
+                    <p><b>✨ Tổng số ngày công:</b> ${totalWorkDays} ngày</p>
+                    <p><b>🏖️ Danh sách ngày nghỉ:</b></p>
+                    <div style="background: #f1f5f9; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; max-height: 100px; overflow-y: auto;">
+                        ${leaveDetails.length > 0 ? leaveDetails.join('<br>') : 'Không có ngày nghỉ nào.'}
+                    </div>
+                    <p><b>⚠️ Thiếu giờ (Vào/Ra):</b></p>
+                    <div style="background: #fef2f2; color: #b91c1c; padding: 8px 12px; border-radius: 8px; max-height: 100px; overflow-y: auto;">
+                        ${missingCheckLogs.length > 0 ? missingCheckLogs.join('<br>') : 'Tuyệt vời! Không có ngày nào bị thiếu giờ.'}
+                    </div>
+                </div>
+            `;
 
             Swal.fire({
                 title: '📊 Bảng Thống Kê Ngày Công',
@@ -725,7 +796,7 @@
                 showCancelButton: true,
                 confirmButtonColor: '#ef4444',
                 cancelButtonColor: '#64748b',
-                confirmButtonText: 'Đồng ý xóa sạch!',
+                confirmButtonText: 'Xác nhận xóa',
                 cancelButtonText: 'Hủy bỏ'
             }).then(async (result) => {
                 if (result.isConfirmed) {
@@ -734,7 +805,7 @@
                         const deletePromises = querySnapshot.docs.map(d => deleteDoc(doc(db, "chamcong", d.id)));
                         await Promise.all(deletePromises);
 
-                        Swal.fire('Đã xóa!', 'Dữ liệu đã được làm sạch.', 'success');
+                        Swal.fire('Đã xóa!', 'Dữ liệu đã được xóa sạch.', 'success');
                         loadAttendance();
                     } catch (e) {
                         console.error(e);
