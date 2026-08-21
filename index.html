@@ -39,6 +39,17 @@
             display: flex;
             justify-content: center;
             min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: radial-gradient(circle at 15% 10%, rgba(99, 102, 241, 0.12), transparent 32%),
+                radial-gradient(circle at 90% 85%, rgba(14, 165, 233, 0.1), transparent 30%);
+            pointer-events: none;
         }
 
         .container {
@@ -49,6 +60,12 @@
             border-radius: 20px;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
             height: fit-content;
+            animation: surface-in 0.55s ease both;
+        }
+
+        @keyframes surface-in {
+            from { opacity: 0; transform: translateY(14px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         h2 {
@@ -67,6 +84,12 @@
             margin-bottom: 16px;
             border: 1px solid var(--border-color);
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+            animation: content-in 0.45s ease both;
+        }
+
+        @keyframes content-in {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .form-group {
@@ -134,6 +157,7 @@
 
         button:hover {
             background: var(--primary-hover);
+            transform: translateY(-1px);
         }
 
         button.is-leave {
@@ -350,6 +374,155 @@
             min-height: 20px;
         }
 
+        .login-mode {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .login-mode button {
+            padding: 9px 8px;
+            background: #e2e8f0;
+            color: var(--text-secondary);
+            box-shadow: none;
+            font-size: 0.82rem;
+        }
+
+        .login-mode button.active {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .admin-panel {
+            border-color: #c7d2fe;
+            background: #eef2ff;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .admin-header strong {
+            color: #3730a3;
+        }
+
+        .employee-list {
+            display: grid;
+            gap: 10px;
+            max-height: 420px;
+            overflow-y: auto;
+        }
+
+        .employee-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: center;
+            padding: 12px;
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            animation: content-in 0.35s ease both;
+        }
+
+        .employee-row:nth-child(2) { animation-delay: 0.04s; }
+        .employee-row:nth-child(3) { animation-delay: 0.08s; }
+        .employee-row:nth-child(4) { animation-delay: 0.12s; }
+        .employee-row:nth-child(5) { animation-delay: 0.16s; }
+
+        .admin-loading-row {
+            height: 66px;
+            border-radius: 10px;
+            background: linear-gradient(100deg, #e0e7ff 20%, #fff 40%, #e0e7ff 60%);
+            background-size: 200% 100%;
+            animation: shimmer 1.2s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+            from { background-position: 200% 0; }
+            to { background-position: -200% 0; }
+        }
+
+        .employee-info {
+            min-width: 0;
+        }
+
+        .employee-info strong,
+        .employee-info span {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .employee-info span {
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            margin-top: 3px;
+        }
+
+        .employee-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .employee-actions button {
+            width: auto;
+            padding: 8px 10px;
+            font-size: 0.8rem;
+        }
+
+        .admin-summary {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .admin-stat {
+            padding: 10px 6px;
+            text-align: center;
+            background: #fff;
+            border: 1px solid #c7d2fe;
+            border-radius: 10px;
+        }
+
+        .admin-stat strong {
+            display: block;
+            color: #3730a3;
+            font-size: 1.25rem;
+        }
+
+        .admin-stat span {
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+        }
+
+        .admin-tools {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .admin-tools input,
+        .admin-tools button {
+            flex: 1;
+        }
+
+        @media (max-width: 420px) {
+            .employee-row {
+                grid-template-columns: 1fr;
+            }
+
+            .employee-actions button {
+                flex: 1;
+            }
+        }
+
         .hidden {
             display: none !important;
         }
@@ -415,6 +588,10 @@
     <section id="authScreen" class="container auth-screen">
         <h1>🔐 Đăng nhập sổ chấm công</h1>
         <p>Sử dụng tài khoản được cấp để xem dữ liệu cá nhân.</p>
+        <div class="login-mode" role="tablist" aria-label="Loại tài khoản">
+            <button id="employeeLoginMode" type="button" class="active" role="tab">Nhân viên</button>
+            <button id="adminLoginMode" type="button" role="tab">Quản trị viên</button>
+        </div>
         <form id="loginForm">
             <div class="form-group">
                 <label for="loginEmail">Tên đăng nhập / Email</label>
@@ -434,8 +611,32 @@
             <strong id="userDisplayName"></strong>
             <button id="logoutBtn" type="button" class="btn-danger" style="width:auto; padding:8px 12px;">Đăng xuất</button>
         </div>
-        <h2>📅 Sổ Chấm Công Cá Nhân</h2>
+        <h2 id="appTitle">📅 Sổ Chấm Công Cá Nhân</h2>
 
+        <section id="adminPanel" class="card admin-panel hidden">
+            <div class="admin-header">
+                <strong>👥 Quản lý nhân viên</strong>
+                <button id="refreshEmployeesBtn" type="button" class="btn-secondary" style="width:auto; padding:8px 10px;">↻ Làm mới</button>
+            </div>
+            <div class="admin-summary">
+                <div class="admin-stat"><strong id="totalEmployees">0</strong><span>Tổng nhân viên</span></div>
+                <div class="admin-stat"><strong id="activeEmployees">0</strong><span>Đang hoạt động</span></div>
+                <div class="admin-stat"><strong id="checkedEmployees">0</strong><span>Đã chấm hôm nay</span></div>
+            </div>
+            <div class="admin-tools">
+                <input id="adminMonth" type="month" aria-label="Tháng báo cáo">
+                <button id="exportAllCsvBtn" type="button" class="btn-secondary">⬇️ Xuất CSV</button>
+            </div>
+            <div class="form-group">
+                <label for="employeeSearch">Tìm nhân viên</label>
+                <input id="employeeSearch" type="search" placeholder="Tên hoặc email nhân viên">
+            </div>
+            <div id="employeeList" class="employee-list">
+                <p style="color:var(--text-secondary);">Đang tải danh sách...</p>
+            </div>
+        </section>
+
+        <div id="employeeWorkspace">
         <div class="card">
             <div class="form-group">
                 <label for="displayNameInput">Tên hiển thị</label>
@@ -498,6 +699,7 @@
             <div class="skeleton"></div>
             <div class="skeleton"></div>
         </div>
+        </div>
     </main>
 
     <!-- KHUNG BẢNG CHI TIẾT DÙNG ĐỂ IN BÁO CÁO -->
@@ -559,14 +761,18 @@
         const loginForm = document.getElementById('loginForm');
         const authError = document.getElementById('authError');
         const loginBtn = document.getElementById('loginBtn');
+        const adminEmail = 'admin@gmail.com';
+        let loginAsAdmin = false;
         let currentUser = null;
         let attendanceCollection = null;
+        let employees = [];
+        let employeeAttendance = new Map();
 
         function showAuthError(error) {
             const messages = {
                 'auth/invalid-credential': 'Tên đăng nhập hoặc mật khẩu không đúng.',
                 'auth/invalid-email': 'Tên đăng nhập không hợp lệ.',
-                'auth/too-many-requests': 'Có quá nhiều lần thử. Vui lòng thử lại sau.'
+                'auth/admin-email-required': 'Chế độ quản trị yêu cầu tài khoản admin@gmail.com.'
             };
             authError.textContent = messages[error.code] || 'Không thể đăng nhập. Vui lòng thử lại.';
         }
@@ -576,6 +782,18 @@
             return identifier.includes('@') ? identifier : `${identifier}@chamcong.local`;
         }
 
+        function setLoginMode(asAdmin) {
+            loginAsAdmin = asAdmin;
+            document.getElementById('employeeLoginMode').classList.toggle('active', !asAdmin);
+            document.getElementById('adminLoginMode').classList.toggle('active', asAdmin);
+            document.querySelector('#authScreen p').textContent = asAdmin
+                ? 'Đăng nhập bằng tài khoản quản trị để quản lý nhân viên.'
+                : 'Sử dụng tài khoản được cấp để xem dữ liệu cá nhân.';
+        }
+
+        document.getElementById('employeeLoginMode').addEventListener('click', () => setLoginMode(false));
+        document.getElementById('adminLoginMode').addEventListener('click', () => setLoginMode(true));
+
         loginForm.addEventListener('submit', async (event) => {
             event.preventDefault();
             authError.textContent = '';
@@ -583,7 +801,11 @@
             loginBtn.textContent = 'Đang đăng nhập...';
             try {
                 await setPersistence(auth, browserLocalPersistence);
-                await signInWithEmailAndPassword(auth, normalizeLoginIdentifier(document.getElementById('loginEmail').value), document.getElementById('loginPassword').value);
+                const email = normalizeLoginIdentifier(document.getElementById('loginEmail').value);
+                if (loginAsAdmin && email !== adminEmail) {
+                    throw { code: 'auth/admin-email-required' };
+                }
+                await signInWithEmailAndPassword(auth, email, document.getElementById('loginPassword').value);
             } catch (error) {
                 console.error(error);
                 showAuthError(error);
@@ -633,6 +855,28 @@
             return match ? Number(match[1]) * 60 + Number(match[2]) : null;
         }
 
+        function roundCheckOutTime(totalMinutes) {
+            const roundedMinutes = totalMinutes % 60 < 15
+                ? totalMinutes - (totalMinutes % 60)
+                : totalMinutes % 60 < 45
+                    ? totalMinutes - (totalMinutes % 60) + 30
+                    : totalMinutes - (totalMinutes % 60) + 60;
+            const hour = Math.floor(roundedMinutes / 60) % 24;
+            const minute = roundedMinutes % 60;
+            return {
+                minutes: roundedMinutes,
+                text: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+            };
+        }
+
+        function getEarlyLeaveText(diffMinutes) {
+            const hours = Math.floor(diffMinutes / 60);
+            const minutes = diffMinutes % 60;
+            if (!hours) return `${minutes} phút`;
+            if (!minutes) return `${hours} giờ`;
+            return `${hours} giờ ${minutes} phút`;
+        }
+
         function getFilteredData() {
             const month = document.getElementById('reportMonth').value;
             const status = document.getElementById('reportStatus').value;
@@ -643,6 +887,7 @@
                 const matchesStatus = !status
                     || (status === 'Nghỉ' && itemStatus.includes('Nghỉ'))
                     || (status === 'Thiếu giờ' && !itemStatus.includes('Nghỉ') && hasMissingTime(item))
+                    || (status === 'Về sớm' && itemStatus.startsWith('Về sớm'))
                     || itemStatus === status;
                 return matchesMonth && matchesStatus;
             });
@@ -660,7 +905,7 @@
                 const safeStatus = typeof data.status === 'string' ? data.status : 'Không xác định';
                 const isLeave = safeStatus.includes('Nghỉ');
                 const isLate = safeStatus === 'Đi trễ';
-                const isEarly = safeStatus === 'Về sớm';
+                const isEarly = safeStatus.startsWith('Về sớm');
                 let statusClass = isLeave ? 'status-nghi' : isLate ? 'status-trễ' : isEarly ? 'status-som' : 'status-lam';
                 const timeHtml = isLeave
                     ? `<span>Trạng thái: <strong class="time-badge">${escapeHtml(safeStatus)}</strong></span>`
@@ -733,6 +978,171 @@
             }
         };
 
+        function renderEmployees() {
+            const list = document.getElementById('employeeList');
+            const keyword = document.getElementById('employeeSearch').value.trim().toLowerCase();
+            const visibleEmployees = employees.filter(employee => {
+                const text = `${employee.displayName || ''} ${employee.email || ''}`.toLowerCase();
+                return text.includes(keyword);
+            });
+
+            if (!visibleEmployees.length) {
+                list.innerHTML = '<p style="color:var(--text-secondary); text-align:center; padding:12px;">Không tìm thấy nhân viên.</p>';
+                return;
+            }
+
+            list.innerHTML = visibleEmployees.map(employee => `
+                <div class="employee-row">
+                    <div class="employee-info">
+                        <strong>${escapeHtml(employee.displayName || 'Chưa đặt tên')}</strong>
+                        <span>${escapeHtml(employee.email || employee.uid)}</span>
+                        <span>${employee.active === false ? 'Trạng thái: Đã khóa' : 'Trạng thái: Đang hoạt động'}</span>
+                    </div>
+                    <div class="employee-actions">
+                        <button type="button" class="btn-secondary" data-view-attendance="${escapeHtml(employee.uid)}">Xem công</button>
+                        <button type="button" class="btn-secondary" data-edit-employee="${escapeHtml(employee.uid)}">Sửa</button>
+                        <button type="button" class="${employee.active === false ? 'btn-secondary' : 'btn-danger'}" data-toggle-employee="${escapeHtml(employee.uid)}">${employee.active === false ? 'Mở khóa' : 'Khóa'}</button>
+                    </div>
+                </div>
+            `).join('');
+
+            list.querySelectorAll('[data-edit-employee]').forEach(button => {
+                button.addEventListener('click', () => editEmployee(button.dataset.editEmployee));
+            });
+            list.querySelectorAll('[data-view-attendance]').forEach(button => {
+                button.addEventListener('click', () => viewEmployeeAttendance(button.dataset.viewAttendance));
+            });
+            list.querySelectorAll('[data-toggle-employee]').forEach(button => {
+                button.addEventListener('click', () => toggleEmployee(button.dataset.toggleEmployee));
+            });
+        }
+
+        async function loadEmployees() {
+            const list = document.getElementById('employeeList');
+            list.innerHTML = '<div class="admin-loading-row"></div><div class="admin-loading-row"></div><div class="admin-loading-row"></div>';
+            try {
+                const snapshot = await getDocs(collection(db, 'users'));
+                employees = snapshot.docs.map(employeeDoc => ({ uid: employeeDoc.id, ...employeeDoc.data() }))
+                    .filter(employee => employee.uid !== currentUser.uid)
+                    .sort((first, second) => String(first.displayName || first.email || '').localeCompare(String(second.displayName || second.email || ''), 'vi'));
+                employeeAttendance = new Map();
+                await Promise.all(employees.map(async employee => {
+                    const attendanceSnapshot = await getDocs(collection(db, 'users', employee.uid, 'attendance'));
+                    employeeAttendance.set(employee.uid, attendanceSnapshot.docs.map(record => record.data()));
+                }));
+                updateAdminSummary();
+                renderEmployees();
+            } catch (error) {
+                console.error(error);
+                list.innerHTML = '<p style="color:var(--danger);">Không thể tải danh sách nhân viên. Hãy kiểm tra Firestore Rules.</p>';
+            }
+        }
+
+        function updateAdminSummary() {
+            const todayRecords = employees.map(employee => (employeeAttendance.get(employee.uid) || [])
+                .find(record => record.date === todayStr));
+            document.getElementById('totalEmployees').textContent = employees.length;
+            document.getElementById('activeEmployees').textContent = employees.filter(employee => employee.active !== false).length;
+            document.getElementById('checkedEmployees').textContent = todayRecords.filter(Boolean).length;
+        }
+
+        async function viewEmployeeAttendance(uid) {
+            const employee = employees.find(item => item.uid === uid);
+            if (!employee) return;
+            const month = document.getElementById('adminMonth').value;
+            const records = (employeeAttendance.get(uid) || [])
+                .filter(record => !month || String(record.date || '').startsWith(month))
+                .sort((first, second) => String(second.date).localeCompare(String(first.date)));
+            const rows = records.length ? records.map(record => `
+                <tr>
+                    <td>${escapeHtml(record.date)}</td>
+                    <td>${escapeHtml(record.status || '')}</td>
+                    <td>${escapeHtml(record.checkIn || 'Chưa chấm')}</td>
+                    <td>${escapeHtml(record.checkOut || 'Chưa chấm')}</td>
+                </tr>
+            `).join('') : '<tr><td colspan="4">Không có dữ liệu trong tháng này.</td></tr>';
+            await Swal.fire({
+                title: escapeHtml(employee.displayName || employee.email || 'Nhân viên'),
+                html: `<div style="max-height:360px;overflow:auto;"><table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px;"><thead><tr><th>Ngày</th><th>Trạng thái</th><th>Vào</th><th>Ra</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+                confirmButtonText: 'Đóng',
+                width: 640
+            });
+        }
+
+        function exportAllEmployeesCsv() {
+            const month = document.getElementById('adminMonth').value;
+            const rows = [['Nhân viên', 'Email', 'Ngày', 'Trạng thái', 'Giờ vào', 'Giờ ra']];
+            employees.forEach(employee => {
+                (employeeAttendance.get(employee.uid) || []).filter(record => !month || String(record.date || '').startsWith(month))
+                    .forEach(record => rows.push([
+                        employee.displayName || 'Chưa đặt tên', employee.email || '', record.date || '',
+                        record.status || '', record.checkIn || 'Chưa chấm', record.checkOut || 'Chưa chấm'
+                    ]));
+            });
+            if (rows.length === 1) {
+                Swal.fire('Trống', 'Không có dữ liệu chấm công để xuất.', 'info');
+                return;
+            }
+            const csv = rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }));
+            link.download = `bao-cao-nhan-vien-${month || todayStr}.csv`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+
+        async function editEmployee(uid) {
+            const employee = employees.find(item => item.uid === uid);
+            if (!employee) return;
+            const result = await Swal.fire({
+                title: 'Sửa nhân viên',
+                input: 'text',
+                inputValue: employee.displayName || '',
+                inputLabel: 'Tên hiển thị',
+                inputPlaceholder: 'Nhập tên nhân viên',
+                showCancelButton: true,
+                confirmButtonText: 'Lưu',
+                cancelButtonText: 'Hủy',
+                inputValidator: value => value.trim() ? undefined : 'Vui lòng nhập tên nhân viên.'
+            });
+            if (!result.isConfirmed) return;
+            try {
+                await setDoc(doc(db, 'users', uid), { displayName: result.value.trim() }, { merge: true });
+                await loadEmployees();
+                Swal.fire({ icon: 'success', title: 'Đã cập nhật', timer: 1200, showConfirmButton: false });
+            } catch (error) {
+                console.error(error);
+                Swal.fire('Lỗi', 'Không thể cập nhật nhân viên.', 'error');
+            }
+        }
+
+        async function toggleEmployee(uid) {
+            const employee = employees.find(item => item.uid === uid);
+            if (!employee) return;
+            const willActivate = employee.active === false;
+            const result = await Swal.fire({
+                title: willActivate ? 'Mở khóa nhân viên?' : 'Khóa nhân viên?',
+                text: willActivate ? 'Nhân viên sẽ được đánh dấu đang hoạt động.' : 'Nhân viên sẽ không được phép chấm công nếu Rules kiểm tra trạng thái này.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: willActivate ? 'Mở khóa' : 'Khóa',
+                cancelButtonText: 'Hủy'
+            });
+            if (!result.isConfirmed) return;
+            try {
+                await setDoc(doc(db, 'users', uid), { active: willActivate }, { merge: true });
+                await loadEmployees();
+            } catch (error) {
+                console.error(error);
+                Swal.fire('Lỗi', 'Không thể cập nhật trạng thái nhân viên.', 'error');
+            }
+        }
+
+        document.getElementById('employeeSearch').addEventListener('input', renderEmployees);
+        document.getElementById('refreshEmployeesBtn').addEventListener('click', loadEmployees);
+        document.getElementById('adminMonth').value = todayStr.slice(0, 7);
+        document.getElementById('exportAllCsvBtn').addEventListener('click', exportAllEmployeesCsv);
+
         window.saveAttendance = async function () {
             const date = dateInput.value;
             let status = document.getElementById('status').value;
@@ -799,64 +1209,46 @@
                 // Logic đi làm chia làm 2 lần rõ rệt (Lần 1: Vào, Lần 2: Ra)
                 if (!todayExistingRecord) {
                     // --- LẦN 1: CHẤM CÔNG VÀO ---
-                    if (totalCurrentMinutes <= 8 * 60) {
+                    if (totalCurrentMinutes < 6 * 60) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Chưa đến giờ chấm công vào!',
+                            text: 'Chỉ được chấm công vào từ 06:00 sáng.',
+                            confirmButtonColor: '#f59e0b'
+                        });
+                        return;
+                    } else if (totalCurrentMinutes <= 8 * 60) {
                         calculatedCheckIn = currentTime;
                         finalStatus = "Đi làm";
-                    } else if (totalCurrentMinutes > 8 * 60 && totalCurrentMinutes <= 8 * 60 + 30) {
+                    } else if (totalCurrentMinutes <= 12 * 60) {
                         calculatedCheckIn = currentTime;
                         finalStatus = "Đi trễ";
-                    } else if (totalCurrentMinutes > 8 * 60 + 30 && totalCurrentMinutes <= 12 * 60) {
-                        calculatedCheckIn = "Quên vào";
-                        finalStatus = "Đi làm";
-                    } else if (totalCurrentMinutes > 12 * 60 && totalCurrentMinutes <= 18 * 60 + 35) {
-                        // Trường hợp qua trưa mà chưa chấm vào, hệ thống cho phép chấm gộp hoặc tính vào luôn
-                        calculatedCheckIn = "Quên vào";
-                        let standardOutMinutes = 18 * 60 + 30;
-                        if (totalCurrentMinutes < standardOutMinutes) {
-                            let diffMinutes = standardOutMinutes - totalCurrentMinutes;
-                            if (diffMinutes <= 30) {
-                                calculatedCheckOut = "18:30 (Đã làm tròn)";
-                            } else {
-                                calculatedCheckOut = `${currentTime} (Về sớm ${diffMinutes}p)`;
-                            }
-                            finalStatus = "Về sớm";
-                        } else {
-                            calculatedCheckOut = currentTime;
-                            finalStatus = "Đi làm";
-                        }
                     } else {
                         Swal.fire({
                             icon: 'warning',
-                            title: 'Ngoài khung giờ cho phép!',
+                            title: 'Đã quá giờ chấm công vào!',
+                            text: 'Chấm công vào chỉ được thực hiện trước hoặc lúc 12:00.',
                             confirmButtonColor: '#f59e0b'
                         });
                         return;
                     }
                 } else {
                     // --- LẦN 2: CHẤM CÔNG RA ---
-                    if (totalCurrentMinutes >= 12 * 60 + 1 && totalCurrentMinutes <= 18 * 60 + 35) {
-                        let standardOutMinutes = 18 * 60 + 30; // 18:30
-
-                        if (totalCurrentMinutes < standardOutMinutes) {
-                            let diffMinutes = standardOutMinutes - totalCurrentMinutes;
-                            if (diffMinutes <= 30) {
-                                calculatedCheckOut = "18:30 (Đã làm tròn)";
-                            } else {
-                                calculatedCheckOut = `${currentTime} (Về sớm ${diffMinutes}p)`;
-                            }
-                            finalStatus = "Về sớm";
+                    if (totalCurrentMinutes >= 12 * 60) {
+                        const roundedCheckOut = roundCheckOutTime(totalCurrentMinutes);
+                        const standardOutMinutes = 18 * 60 + 30;
+                        calculatedCheckOut = roundedCheckOut.text;
+                        if (roundedCheckOut.minutes < standardOutMinutes) {
+                            const diffMinutes = standardOutMinutes - roundedCheckOut.minutes;
+                            finalStatus = `Về sớm ${getEarlyLeaveText(diffMinutes)}`;
                         } else {
-                            calculatedCheckOut = currentTime;
                             finalStatus = typeof todayExistingRecord.status === 'string' ? todayExistingRecord.status : 'Đi làm';
                         }
-                    } else if (totalCurrentMinutes > 18 * 60 + 35) {
-                        calculatedCheckOut = currentTime;
-                        finalStatus = typeof todayExistingRecord.status === 'string' ? todayExistingRecord.status : 'Đi làm';
                     } else {
                         Swal.fire({
                             icon: 'warning',
                             title: 'Chưa tới giờ chấm công ra!',
-                            text: 'Chỉ được phép chấm ra sau 12:01 trưa.',
+                            text: 'Chỉ được phép chấm công ra từ 12:00 trưa.',
                             confirmButtonColor: '#f59e0b'
                         });
                         return;
@@ -945,7 +1337,7 @@
                     const safeStatus = typeof data.status === 'string' ? data.status : 'Không xác định';
                     const isLeave = safeStatus.includes('Nghỉ');
                     const isLate = safeStatus === 'Đi trễ';
-                    const isEarly = safeStatus === 'Về sớm';
+                    const isEarly = safeStatus.startsWith('Về sớm');
 
                     let statusClass = 'status-lam';
                     if (isLeave) statusClass = 'status-nghi';
@@ -1213,13 +1605,21 @@
                 attendanceCollection = getUserAttendanceCollection();
                 authScreen.classList.add('hidden');
                 appScreen.classList.remove('hidden');
+                const isAdmin = user.email?.toLowerCase() === adminEmail;
+                document.getElementById('adminPanel').classList.toggle('hidden', !isAdmin);
+                document.getElementById('employeeWorkspace').classList.toggle('hidden', isAdmin);
+                document.getElementById('appTitle').textContent = isAdmin ? '👥 Bảng Quản Lý Nhân Viên' : '📅 Sổ Chấm Công Cá Nhân';
                 const profileSnapshot = await getDoc(doc(db, 'users', user.uid));
                 const profile = profileSnapshot.exists() ? profileSnapshot.data() : {};
                 document.getElementById('displayNameInput').value = profile.displayName || user.displayName || '';
                 document.getElementById('userDisplayName').textContent =
                     `👤 ${profile.displayName || user.displayName || user.email}`;
-                await loadAttendance();
-                scheduleReminders();
+                if (isAdmin) {
+                    await loadEmployees();
+                } else {
+                    await loadAttendance();
+                    scheduleReminders();
+                }
             } catch (error) {
                 console.error(error);
                 appScreen.classList.add('hidden');
