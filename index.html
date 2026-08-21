@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sổ Chấm Công Cá Nhân</title>
 
     <!-- Thư viện thông báo SweetAlert2 -->
@@ -291,6 +291,69 @@
             display: none;
         }
 
+        .print-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 10px;
+            margin-bottom: 14px;
+            font-size: 12px;
+            color: #475569;
+        }
+
+        .print-summary {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .print-summary-card {
+            border: 1px solid #cbd5e1;
+            padding: 9px;
+            text-align: center;
+            border-radius: 6px;
+        }
+
+        .print-summary-card strong {
+            display: block;
+            font-size: 18px;
+            margin-top: 3px;
+        }
+
+        .auth-screen {
+            width: 100%;
+            max-width: 420px;
+            align-self: flex-start;
+            margin-top: 8vh;
+        }
+
+        .auth-screen h1 {
+            color: var(--primary);
+            text-align: center;
+            font-size: 1.35rem;
+            margin-bottom: 8px;
+        }
+
+        .auth-screen p {
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+
+        .auth-error {
+            color: var(--danger);
+            font-size: 0.85rem;
+            margin: 10px 0;
+            min-height: 20px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
         @media print {
             body * {
                 visibility: hidden;
@@ -311,14 +374,76 @@
                 color: #000;
                 background: #fff;
             }
+
+            @page {
+                size: A4 portrait;
+                margin: 12mm;
+            }
+
+            #print-section h2 {
+                font-size: 20px;
+                margin-top: 0;
+            }
+
+            #print-section table {
+                page-break-inside: auto;
+            }
+
+            #print-section tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+
+            #print-section thead {
+                display: table-header-group;
+            }
+
+            #print-section tfoot {
+                display: table-footer-group;
+            }
+
+            #print-section .print-meta,
+            #print-section .print-summary {
+                page-break-inside: avoid;
+            }
         }
     </style>
 </head>
 
 <body>
 
-    <div class="container">
+    <section id="authScreen" class="container auth-screen">
+        <h1>🔐 Đăng nhập sổ chấm công</h1>
+        <p>Sử dụng tài khoản được cấp để xem dữ liệu cá nhân.</p>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="loginEmail">Tên đăng nhập / Email</label>
+                <input id="loginEmail" type="text" autocomplete="username" required>
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">Mật khẩu</label>
+                <input id="loginPassword" type="password" autocomplete="current-password" required>
+            </div>
+            <div id="authError" class="auth-error" role="alert"></div>
+            <button id="loginBtn" type="submit">Đăng nhập</button>
+        </form>
+    </section>
+
+    <main id="appScreen" class="container hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:16px;">
+            <strong id="userDisplayName"></strong>
+            <button id="logoutBtn" type="button" class="btn-danger" style="width:auto; padding:8px 12px;">Đăng xuất</button>
+        </div>
         <h2>📅 Sổ Chấm Công Cá Nhân</h2>
+
+        <div class="card">
+            <div class="form-group">
+                <label for="displayNameInput">Tên hiển thị</label>
+                <input id="displayNameInput" type="text" maxlength="80" autocomplete="name"
+                    placeholder="Nhập tên của bạn">
+            </div>
+            <button id="saveProfileBtn" type="button" class="btn-secondary" onclick="saveProfile()">Lưu tên hiển thị</button>
+        </div>
 
         <div class="card">
             <div class="form-group">
@@ -343,7 +468,29 @@
 
         <div class="btn-group">
             <button class="btn-secondary" onclick="openReportModal()">📊 Thống Kê & In Ngày Công</button>
-            <button class="btn-danger" onclick="confirmClearData()">🗑️ Xóa Toàn Bộ Dữ Liệu CSDL</button>
+            <button class="btn-secondary" onclick="exportCsv()">⬇️ Xuất CSV</button>
+            <button class="btn-secondary" onclick="enableReminders()">🔔 Bật nhắc chấm công</button>
+            <button class="btn-danger" onclick="confirmClearData()">🗑️ Xóa Dữ Liệu Của Tôi</button>
+        </div>
+
+        <div class="card">
+            <div style="display:flex; gap:8px;">
+                <div class="form-group" style="flex:1;">
+                    <label for="reportMonth">Tháng</label>
+                    <input id="reportMonth" type="month">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label for="reportStatus">Trạng thái</label>
+                    <select id="reportStatus">
+                        <option value="">Tất cả</option>
+                        <option value="Đi làm">Đi làm</option>
+                        <option value="Đi trễ">Đi trễ</option>
+                        <option value="Về sớm">Về sớm</option>
+                        <option value="Nghỉ">Ngày nghỉ</option>
+                        <option value="Thiếu giờ">Thiếu giờ</option>
+                    </select>
+                </div>
+            </div>
         </div>
 
         <div class="history-title">Lịch sử gần đây</div>
@@ -351,14 +498,19 @@
             <div class="skeleton"></div>
             <div class="skeleton"></div>
         </div>
-    </div>
+    </main>
 
     <!-- KHUNG BẢNG CHI TIẾT DÙNG ĐỂ IN BÁO CÁO -->
     <div id="print-section">
         <h2 style="text-align: center; margin-bottom: 5px; color: #000;">BÁO CÁO CHI TIẾT NGÀY CÔNG</h2>
+        <div class="print-meta">
+            <span id="print-user-name"></span>
+            <span id="print-created-at"></span>
+        </div>
         <p id="print-date-range" style="text-align: center; font-size: 13px; margin-bottom: 20px; color: #555;"></p>
 
-        <div id="print-summary-box" style="margin-bottom: 20px; font-size: 14px; line-height: 1.5;"></div>
+        <div id="print-summary-box" class="print-summary"></div>
+        <div id="print-details" style="font-size: 12px; line-height: 1.5; margin-bottom: 18px;"></div>
 
         <h3 style="font-size: 15px; margin-bottom: 8px; border-bottom: 2px solid #000; padding-bottom: 4px;">Chi Tiết
             Lịch Sử Chấm Công</h3>
@@ -373,14 +525,21 @@
                 </tr>
             </thead>
             <tbody id="print-table-body"></tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="5" style="padding: 8px; border: 1px solid #cbd5e1; text-align: right; font-size: 11px;">
+                        Hết báo cáo
+                    </td>
+                </tr>
+            </tfoot>
         </table>
     </div>
 
     <!-- Firebase SDKs & Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, updateDoc, doc, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+        import { getFirestore, collection, getDocs, getDoc, setDoc, doc, query, orderBy, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCj1poSyx9DNXgeA27BP4-M-F1KV5ETFRI",
@@ -394,16 +553,125 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const analytics = getAnalytics(app);
+        const auth = getAuth(app);
+        const authScreen = document.getElementById('authScreen');
+        const appScreen = document.getElementById('appScreen');
+        const loginForm = document.getElementById('loginForm');
+        const authError = document.getElementById('authError');
+        const loginBtn = document.getElementById('loginBtn');
+        let currentUser = null;
+        let attendanceCollection = null;
 
-        const todayStr = new Date().toISOString().split('T')[0];
+        function showAuthError(error) {
+            const messages = {
+                'auth/invalid-credential': 'Tên đăng nhập hoặc mật khẩu không đúng.',
+                'auth/invalid-email': 'Tên đăng nhập không hợp lệ.',
+                'auth/too-many-requests': 'Có quá nhiều lần thử. Vui lòng thử lại sau.'
+            };
+            authError.textContent = messages[error.code] || 'Không thể đăng nhập. Vui lòng thử lại.';
+        }
+
+        function normalizeLoginIdentifier(value) {
+            const identifier = value.trim().toLowerCase();
+            return identifier.includes('@') ? identifier : `${identifier}@chamcong.local`;
+        }
+
+        loginForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            authError.textContent = '';
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Đang đăng nhập...';
+            try {
+                await setPersistence(auth, browserLocalPersistence);
+                await signInWithEmailAndPassword(auth, normalizeLoginIdentifier(document.getElementById('loginEmail').value), document.getElementById('loginPassword').value);
+            } catch (error) {
+                console.error(error);
+                showAuthError(error);
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Đăng nhập';
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
+
+        function getUserAttendanceCollection() {
+            if (!currentUser) throw new Error('Chưa đăng nhập');
+            return collection(db, 'users', currentUser.uid, 'attendance');
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, character => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[character]));
+        }
+
+        function getTodayKey() {
+            const parts = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit'
+            }).formatToParts(new Date());
+            return `${parts.find(p => p.type === 'year').value}-${parts.find(p => p.type === 'month').value}-${parts.find(p => p.type === 'day').value}`;
+        }
+
+        const todayStr = getTodayKey();
         const dateInput = document.getElementById('date');
         dateInput.value = todayStr;
         dateInput.max = todayStr;
         dateInput.min = todayStr;
+        document.getElementById('reportMonth').value = todayStr.slice(0, 7);
 
         let globalAttendanceData = [];
         let todayExistingRecord = null;
+        const holidays = new Set(['01-01', '04-30', '05-01', '09-02']);
+
+        function hasMissingTime(item) {
+            return !item.checkIn || item.checkIn === 'Chưa chấm' || !item.checkOut || item.checkOut === 'Chưa chấm';
+        }
+
+        function parseTime(value) {
+            const match = typeof value === 'string' ? value.match(/^(\d{1,2}):(\d{2})/) : null;
+            return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+        }
+
+        function getFilteredData() {
+            const month = document.getElementById('reportMonth').value;
+            const status = document.getElementById('reportStatus').value;
+            return globalAttendanceData.filter(item => {
+                if (!item || typeof item.date !== 'string') return false;
+                const itemStatus = typeof item.status === 'string' ? item.status : '';
+                const matchesMonth = !month || item.date.startsWith(month);
+                const matchesStatus = !status
+                    || (status === 'Nghỉ' && itemStatus.includes('Nghỉ'))
+                    || (status === 'Thiếu giờ' && !itemStatus.includes('Nghỉ') && hasMissingTime(item))
+                    || itemStatus === status;
+                return matchesMonth && matchesStatus;
+            });
+        }
+
+        function renderAttendanceList() {
+            const listDiv = document.getElementById('attendanceList');
+            const filteredData = getFilteredData();
+            if (filteredData.length === 0) {
+                listDiv.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px;">Không có dữ liệu phù hợp.</p>';
+                return;
+            }
+            let itemsHtml = '';
+            filteredData.forEach(data => {
+                const safeStatus = typeof data.status === 'string' ? data.status : 'Không xác định';
+                const isLeave = safeStatus.includes('Nghỉ');
+                const isLate = safeStatus === 'Đi trễ';
+                const isEarly = safeStatus === 'Về sớm';
+                let statusClass = isLeave ? 'status-nghi' : isLate ? 'status-trễ' : isEarly ? 'status-som' : 'status-lam';
+                const timeHtml = isLeave
+                    ? `<span>Trạng thái: <strong class="time-badge">${escapeHtml(safeStatus)}</strong></span>`
+                    : `<span>Vào: <strong class="time-badge">${escapeHtml(data.checkIn || 'Chưa chấm')}</strong></span><span>Ra: <strong class="time-badge">${escapeHtml(data.checkOut || 'Chưa chấm')}</strong></span>`;
+                itemsHtml += `<div class="item"><div><div class="item-date">📅 ${escapeHtml(data.date)}${holidays.has(data.date.slice(5)) ? ' 🎉' : ''}</div><div class="item-time">${timeHtml}</div></div><span class="item-status ${statusClass}">${escapeHtml(safeStatus)}</span></div>`;
+            });
+            listDiv.innerHTML = itemsHtml;
+        }
+
+        document.getElementById('reportMonth').addEventListener('change', renderAttendanceList);
+        document.getElementById('reportStatus').addEventListener('change', renderAttendanceList);
 
         window.updateButtonState = function () {
             const statusVal = document.getElementById('status').value;
@@ -412,7 +680,8 @@
 
             // Kiểm tra xem hôm nay đã hoàn tất thao tác chưa để khóa nút
             if (todayExistingRecord) {
-                if (todayExistingRecord.status.includes('Nghỉ')) {
+                const existingStatus = typeof todayExistingRecord.status === 'string' ? todayExistingRecord.status : '';
+                if (existingStatus.includes('Nghỉ')) {
                     btn.disabled = true;
                     btnText.textContent = 'Hôm nay đã ghi nhận nghỉ (1/1)';
                     return;
@@ -422,6 +691,7 @@
                     btnText.textContent = 'Đã hoàn tất chấm công hôm nay (Vào/Ra)';
                     return;
                 }
+
             }
 
             btn.disabled = false;
@@ -438,6 +708,31 @@
             }
         }
 
+        window.saveProfile = async function () {
+            const input = document.getElementById('displayNameInput');
+            const button = document.getElementById('saveProfileBtn');
+            const displayName = input.value.trim();
+            if (!displayName) {
+                input.focus();
+                Swal.fire('Thiếu tên', 'Vui lòng nhập tên hiển thị.', 'warning');
+                return;
+            }
+
+            button.disabled = true;
+            button.textContent = 'Đang lưu...';
+            try {
+                await setDoc(doc(db, 'users', currentUser.uid), { displayName }, { merge: true });
+                document.getElementById('userDisplayName').textContent = `👤 ${displayName}`;
+                Swal.fire({ icon: 'success', title: 'Đã lưu tên hiển thị', timer: 1400, showConfirmButton: false });
+            } catch (error) {
+                console.error(error);
+                Swal.fire('Lỗi', 'Không thể lưu tên hiển thị.', 'error');
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Lưu tên hiển thị';
+            }
+        };
+
         window.saveAttendance = async function () {
             const date = dateInput.value;
             let status = document.getElementById('status').value;
@@ -452,8 +747,11 @@
             }
 
             const now = new Date();
-            const currentHour = now.getHours();
-            const currentMinute = now.getMinutes();
+            const vietnamParts = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', hour12: false
+            }).formatToParts(now);
+            const currentHour = Number(vietnamParts.find(part => part.type === 'hour').value);
+            const currentMinute = Number(vietnamParts.find(part => part.type === 'minute').value);
             const currentTime = String(currentHour).padStart(2, '0') + ':' + String(currentMinute).padStart(2, '0');
             const totalCurrentMinutes = currentHour * 60 + currentMinute;
 
@@ -465,7 +763,8 @@
 
             // Kiểm tra trạng thái nếu hôm nay đã tồn tại bản ghi
             if (todayExistingRecord) {
-                if (todayExistingRecord.status.includes('Nghỉ')) {
+                const existingStatus = typeof todayExistingRecord.status === 'string' ? todayExistingRecord.status : '';
+                if (existingStatus.includes('Nghỉ')) {
                     Swal.fire('Thông báo', 'Hôm nay bạn đã thực hiện ghi nhận nghỉ rồi (chỉ được phép 1 lần).', 'warning');
                     return;
                 }
@@ -548,11 +847,11 @@
                             finalStatus = "Về sớm";
                         } else {
                             calculatedCheckOut = currentTime;
-                            finalStatus = todayExistingRecord.status;
+                            finalStatus = typeof todayExistingRecord.status === 'string' ? todayExistingRecord.status : 'Đi làm';
                         }
                     } else if (totalCurrentMinutes > 18 * 60 + 35) {
                         calculatedCheckOut = currentTime;
-                        finalStatus = todayExistingRecord.status;
+                        finalStatus = typeof todayExistingRecord.status === 'string' ? todayExistingRecord.status : 'Đi làm';
                     } else {
                         Swal.fire({
                             icon: 'warning',
@@ -574,27 +873,25 @@
             btnText.textContent = 'Đang xử lý...';
 
             try {
-                const querySnapshot = await getDocs(collection(db, "chamcong"));
-                let targetDocId = null;
+                const todayRef = doc(getUserAttendanceCollection(), date);
+                const todaySnapshot = await getDoc(todayRef);
+                const existingRecord = todayExistingRecord || todaySnapshot.data();
 
-                querySnapshot.forEach((d) => {
-                    if (d.data().date === date) {
-                        targetDocId = d.id;
-                    }
-                });
-
-                if (targetDocId) {
-                    await updateDoc(doc(db, "chamcong", targetDocId), {
+                if (todaySnapshot.exists()) {
+                    await setDoc(todayRef, {
                         status: finalStatus,
-                        checkIn: isLeaveStatus ? "Nghỉ" : todayExistingRecord.checkIn,
-                        checkOut: isLeaveStatus ? "Nghỉ" : calculatedCheckOut
-                    });
+                        checkIn: isLeaveStatus ? "Nghỉ" : existingRecord.checkIn,
+                        checkOut: isLeaveStatus ? "Nghỉ" : calculatedCheckOut,
+                        updatedAt: serverTimestamp()
+                    }, { merge: true });
                 } else {
-                    await addDoc(collection(db, "chamcong"), {
+                    await setDoc(todayRef, {
                         date: date,
                         status: finalStatus,
                         checkIn: calculatedCheckIn,
-                        checkOut: calculatedCheckOut ? calculatedCheckOut : "Chưa chấm"
+                        checkOut: calculatedCheckOut ? calculatedCheckOut : "Chưa chấm",
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
                     });
                 }
 
@@ -620,7 +917,7 @@
             const listDiv = document.getElementById('attendanceList');
 
             try {
-                const querySnapshot = await getDocs(collection(db, "chamcong"));
+                const querySnapshot = await getDocs(query(getUserAttendanceCollection(), orderBy('date', 'desc')));
 
                 listDiv.innerHTML = '';
                 globalAttendanceData = [];
@@ -643,10 +940,12 @@
 
                 globalAttendanceData.sort((a, b) => b.date.localeCompare(a.date));
 
+                let itemsHtml = '';
                 globalAttendanceData.forEach((data) => {
-                    const isLeave = data.status.includes('Nghỉ');
-                    const isLate = data.status === 'Đi trễ';
-                    const isEarly = data.status === 'Về sớm';
+                    const safeStatus = typeof data.status === 'string' ? data.status : 'Không xác định';
+                    const isLeave = safeStatus.includes('Nghỉ');
+                    const isLate = safeStatus === 'Đi trễ';
+                    const isEarly = safeStatus === 'Về sớm';
 
                     let statusClass = 'status-lam';
                     if (isLeave) statusClass = 'status-nghi';
@@ -655,29 +954,30 @@
 
                     let timeHtml = '';
                     if (isLeave) {
-                        timeHtml = `<span>Trạng thái: <strong class="time-badge">${data.status}</strong></span>`;
+                        timeHtml = `<span>Trạng thái: <strong class="time-badge">${escapeHtml(safeStatus)}</strong></span>`;
                     } else {
                         timeHtml = `
-                            <span>Vào: <strong class="time-badge">${data.checkIn || 'Chưa chấm'}</strong></span>
-                            <span>Ra: <strong class="time-badge">${data.checkOut || 'Chưa chấm'}</strong></span>
+                            <span>Vào: <strong class="time-badge">${escapeHtml(data.checkIn || 'Chưa chấm')}</strong></span>
+                            <span>Ra: <strong class="time-badge">${escapeHtml(data.checkOut || 'Chưa chấm')}</strong></span>
                         `;
                     }
 
                     const itemHtml = `
                         <div class="item">
                             <div>
-                                <div class="item-date">📅 ${data.date}</div>
+                                <div class="item-date">📅 ${escapeHtml(data.date)}</div>
                                 <div class="item-time">${timeHtml}</div>
                             </div>
-                            <span class="item-status ${statusClass}">${data.status}</span>
+                            <span class="item-status ${statusClass}">${escapeHtml(safeStatus)}</span>
                         </div>
                     `;
-                    listDiv.innerHTML += itemHtml;
+                    itemsHtml += itemHtml;
                 });
+                listDiv.innerHTML = itemsHtml;
 
                 if (todayExistingRecord) {
                     const statusSelect = document.getElementById('status');
-                    if (!todayExistingRecord.status.includes('Nghỉ')) {
+                    if (typeof todayExistingRecord.status !== 'string' || !todayExistingRecord.status.includes('Nghỉ')) {
                         statusSelect.value = 'Đi làm';
                     } else {
                         statusSelect.value = todayExistingRecord.status;
@@ -685,39 +985,34 @@
                 }
 
                 updateButtonState();
+                renderAttendanceList();
                 preparePrintData();
+                localStorage.setItem(`attendance-cache-${currentUser.uid}`, JSON.stringify(globalAttendanceData));
             } catch (e) {
                 console.error(e);
-                listDiv.innerHTML = '<p style="text-align: center; color: #ef4444; padding: 20px; font-size: 0.9rem;">Không thể tải dữ liệu.</p>';
+                const cached = localStorage.getItem(`attendance-cache-${currentUser.uid}`);
+                if (cached) {
+                    globalAttendanceData = JSON.parse(cached);
+                    renderAttendanceList();
+                    preparePrintData();
+                } else {
+                    listDiv.innerHTML = '<p style="text-align: center; color: #ef4444; padding: 20px; font-size: 0.9rem;">Không thể tải dữ liệu.</p>';
+                }
             }
         }
 
         function preparePrintData() {
-            let totalWorkDays = 0;
-            let leaveDetails = [];
-            let missingCheckLogs = [];
-
             let tableRows = '';
-            const sortedData = [...globalAttendanceData].sort((a, b) => a.date.localeCompare(b.date));
+            const sortedData = [...getFilteredData()].sort((a, b) => a.date.localeCompare(b.date));
 
             sortedData.forEach((item, index) => {
-                if (!item.status.includes('Nghỉ')) {
-                    totalWorkDays++;
-                } else {
-                    leaveDetails.push(`${item.date} (${item.status})`);
-                }
-
-                if (!item.status.includes('Nghỉ') && (!item.checkIn || item.checkIn === 'Chưa chấm' || !item.checkOut || item.checkOut === 'Chưa chấm')) {
-                    missingCheckLogs.push(`${item.date} (Vào: ${item.checkIn || 'Thiếu'}, Ra: ${item.checkOut || 'Thiếu'})`);
-                }
-
                 tableRows += `
                     <tr style="border-bottom: 1px solid #cbd5e1;">
                         <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">${index + 1}</td>
-                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1;">${item.date}</td>
-                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1;">${item.status}</td>
-                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">${item.checkIn || '--:--'}</td>
-                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">${item.checkOut || '--:--'}</td>
+                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1;">${escapeHtml(item.date)}</td>
+                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1;">${escapeHtml(item.status)}</td>
+                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">${escapeHtml(item.checkIn || '--:--')}</td>
+                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">${escapeHtml(item.checkOut || '--:--')}</td>
                     </tr>
                 `;
             });
@@ -727,48 +1022,74 @@
             const printDateRangeElem = document.getElementById('print-date-range');
             if (sortedData.length > 0) {
                 printDateRangeElem.textContent = `Thời gian báo cáo: Từ ngày ${sortedData[0].date} đến ngày ${sortedData[sortedData.length - 1].date}`;
+            } else {
+                printDateRangeElem.textContent = 'Không có dữ liệu chấm công';
             }
 
             const summaryBox = document.getElementById('print-summary-box');
+            const stats = getReportStats();
             summaryBox.innerHTML = `
-                <p><b>• Tổng số ngày công:</b> ${totalWorkDays} ngày</p>
-                <p><b>• Danh sách ngày nghỉ:</b> ${leaveDetails.length > 0 ? leaveDetails.join(', ') : 'Không có'}</p>
-                <p><b>• Các ngày thiếu giờ (Vào/Ra):</b> ${missingCheckLogs.length > 0 ? missingCheckLogs.join(', ') : 'Không có'}</p>
+                <div class="print-summary-card">Ngày công<strong>${stats.totalWorkDays}</strong></div>
+                <div class="print-summary-card">Ngày nghỉ<strong>${stats.leaveDetails.length}</strong></div>
+                <div class="print-summary-card">Thiếu giờ<strong>${stats.missingCheckLogs.length}</strong></div>
+                <div class="print-summary-card">Tổng giờ<strong>${stats.totalWorkMinutes ? (stats.totalWorkMinutes / 60).toFixed(1) : '0.0'}</strong></div>
             `;
+            document.getElementById('print-details').innerHTML = `
+                <p><b>Ngày nghỉ:</b> ${stats.leaveDetails.length ? stats.leaveDetails.map(escapeHtml).join(', ') : 'Không có'}</p>
+                <p><b>Ngày thiếu giờ:</b> ${stats.missingCheckLogs.length ? stats.missingCheckLogs.map(escapeHtml).join(', ') : 'Không có'}</p>
+            `;
+            document.getElementById('print-user-name').textContent =
+                document.getElementById('userDisplayName').textContent || 'Người dùng';
+            document.getElementById('print-created-at').textContent =
+                `Ngày in: ${new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date())}`;
+        }
+
+        function getReportStats(data = getFilteredData()) {
+            const leaveDetails = [];
+            const missingCheckLogs = [];
+            let totalWorkDays = 0;
+            let totalWorkMinutes = 0;
+
+            data.forEach(item => {
+                const status = typeof item.status === 'string' ? item.status : 'Không xác định';
+                const isLeave = status.includes('Nghỉ');
+                if (isLeave) {
+                    leaveDetails.push(`• ${item.date}: ${status}`);
+                } else {
+                    totalWorkDays++;
+                    if (!item.checkIn || item.checkIn === 'Chưa chấm' || !item.checkOut || item.checkOut === 'Chưa chấm') {
+                        missingCheckLogs.push(`• Ngày ${item.date} (Vào: ${item.checkIn || 'Thiếu'}, Ra: ${item.checkOut || 'Thiếu'})`);
+                    } else {
+                        const checkIn = parseTime(item.checkIn);
+                        const checkOut = parseTime(item.checkOut);
+                        if (checkIn !== null && checkOut !== null && checkOut >= checkIn) {
+                            totalWorkMinutes += checkOut - checkIn;
+                        }
+                    }
+                }
+            });
+
+            return { totalWorkDays, leaveDetails, missingCheckLogs, totalWorkMinutes };
         }
 
         window.openReportModal = function () {
-            if (globalAttendanceData.length === 0) {
+            if (getFilteredData().length === 0) {
                 Swal.fire('Trống', 'Chưa có dữ liệu để tổng hợp báo cáo.', 'info');
                 return;
             }
 
-            let totalWorkDays = 0;
-            let leaveDetails = [];
-            let missingCheckLogs = [];
-
-            globalAttendanceData.forEach(item => {
-                if (!item.status.includes('Nghỉ')) {
-                    totalWorkDays++;
-                } else {
-                    leaveDetails.push(`• ${item.date}: ${item.status}`);
-                }
-
-                if (!item.status.includes('Nghỉ') && (!item.checkIn || item.checkIn === 'Chưa chấm' || !item.checkOut || item.checkOut === 'Chưa chấm')) {
-                    missingCheckLogs.push(`• Ngày ${item.date} (Vào: ${item.checkIn || 'Thiếu'}, Ra: ${item.checkOut || 'Thiếu'})`);
-                }
-            });
+            const { totalWorkDays, leaveDetails, missingCheckLogs } = getReportStats();
 
             let htmlContent = `
                 <div style="text-align: left; font-size: 0.95rem; line-height: 1.6;">
                     <p><b>✨ Tổng số ngày công:</b> ${totalWorkDays} ngày</p>
                     <p><b>🏖️ Danh sách ngày nghỉ:</b></p>
                     <div style="background: #f1f5f9; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; max-height: 100px; overflow-y: auto;">
-                        ${leaveDetails.length > 0 ? leaveDetails.join('<br>') : 'Không có ngày nghỉ nào.'}
+                        ${leaveDetails.length > 0 ? leaveDetails.map(escapeHtml).join('<br>') : 'Không có ngày nghỉ nào.'}
                     </div>
                     <p><b>⚠️ Thiếu giờ (Vào/Ra):</b></p>
                     <div style="background: #fef2f2; color: #b91c1c; padding: 8px 12px; border-radius: 8px; max-height: 100px; overflow-y: auto;">
-                        ${missingCheckLogs.length > 0 ? missingCheckLogs.join('<br>') : 'Tuyệt vời! Không có ngày nào bị thiếu giờ.'}
+                        ${missingCheckLogs.length > 0 ? missingCheckLogs.map(escapeHtml).join('<br>') : 'Tuyệt vời! Không có ngày nào bị thiếu giờ.'}
                     </div>
                 </div>
             `;
@@ -783,15 +1104,70 @@
                 cancelButtonColor: '#64748b'
             }).then((result) => {
                 if (result.isConfirmed) {
+                    preparePrintData();
                     window.print();
                 }
             });
         };
 
+        window.exportCsv = function () {
+            const data = [...getFilteredData()].sort((a, b) => a.date.localeCompare(b.date));
+            if (data.length === 0) {
+                Swal.fire('Trống', 'Không có dữ liệu phù hợp để xuất.', 'info');
+                return;
+            }
+            const header = ['STT', 'Ngày', 'Trạng thái', 'Giờ vào', 'Giờ ra'];
+            const rows = data.map((item, index) => [
+                index + 1, item.date, item.status || '', item.checkIn || 'Chưa chấm', item.checkOut || 'Chưa chấm'
+            ]);
+            const csv = [header, ...rows].map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `bao-cao-cham-cong-${todayStr}.csv`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        };
+
+        window.enableReminders = async function () {
+            if (!('Notification' in window)) {
+                Swal.fire('Không hỗ trợ', 'Trình duyệt này không hỗ trợ thông báo.', 'info');
+                return;
+            }
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                Swal.fire('Chưa bật thông báo', 'Bạn cần cho phép thông báo trong trình duyệt.', 'warning');
+                return;
+            }
+            localStorage.setItem(`attendance-reminders-${currentUser.uid}`, 'true');
+            scheduleReminders();
+            new Notification('Nhắc chấm công', { body: 'Đã bật nhắc lúc 08:30 và 17:30 khi trang đang mở.' });
+            Swal.fire({ icon: 'success', title: 'Đã bật nhắc', text: 'Hãy mở trang vào các khung giờ nhắc để nhận thông báo.', timer: 1800, showConfirmButton: false });
+        };
+
+        function scheduleReminders() {
+            if (!currentUser || localStorage.getItem(`attendance-reminders-${currentUser.uid}`) !== 'true') return;
+            if (window.attendanceReminderTimer) clearInterval(window.attendanceReminderTimer);
+            window.attendanceReminderTimer = setInterval(() => {
+                const parts = new Intl.DateTimeFormat('en-GB', {
+                    timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', hour12: false
+                }).formatToParts(new Date());
+                const hour = parts.find(part => part.type === 'hour').value;
+                const minute = parts.find(part => part.type === 'minute').value;
+                const key = `${todayStr}-${hour}:${minute}`;
+                if ((hour === '08' && minute === '30' || hour === '17' && minute === '30')
+                    && localStorage.getItem('last-attendance-reminder') !== key
+                    && Notification.permission === 'granted') {
+                    localStorage.setItem('last-attendance-reminder', key);
+                    new Notification('Nhắc chấm công', { body: 'Bạn hãy kiểm tra và ghi nhận chấm công hôm nay.' });
+                }
+            }, 30000);
+        }
+
         window.confirmClearData = function () {
             Swal.fire({
                 title: 'Bạn có chắc chắn muốn xóa?',
-                text: "Hành động này sẽ xóa sạch toàn bộ lịch sử chấm công trên CSDL!",
+                text: "Hành động này chỉ xóa lịch sử chấm công của tài khoản đang đăng nhập!",
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#ef4444',
@@ -801,12 +1177,21 @@
             }).then(async (result) => {
                 if (result.isConfirmed) {
                     try {
-                        const querySnapshot = await getDocs(collection(db, "chamcong"));
-                        const deletePromises = querySnapshot.docs.map(d => deleteDoc(doc(db, "chamcong", d.id)));
-                        await Promise.all(deletePromises);
+                        const querySnapshot = await getDocs(getUserAttendanceCollection());
+                        const batches = [];
+                        let batch = writeBatch(db);
+                        querySnapshot.docs.forEach((record, index) => {
+                            batch.delete(record.ref);
+                            if ((index + 1) % 450 === 0) {
+                                batches.push(batch.commit());
+                                batch = writeBatch(db);
+                            }
+                        });
+                        if (querySnapshot.docs.length % 450 !== 0) batches.push(batch.commit());
+                        await Promise.all(batches);
 
                         Swal.fire('Đã xóa!', 'Dữ liệu đã được xóa sạch.', 'success');
-                        loadAttendance();
+                        await loadAttendance();
                     } catch (e) {
                         console.error(e);
                         Swal.fire('Lỗi', 'Không thể xóa dữ liệu.', 'error');
@@ -815,7 +1200,33 @@
             });
         };
 
-        loadAttendance();
+        onAuthStateChanged(auth, async (user) => {
+            currentUser = user;
+            if (!user) {
+                authScreen.classList.remove('hidden');
+                appScreen.classList.add('hidden');
+                attendanceCollection = null;
+                return;
+            }
+
+            try {
+                attendanceCollection = getUserAttendanceCollection();
+                authScreen.classList.add('hidden');
+                appScreen.classList.remove('hidden');
+                const profileSnapshot = await getDoc(doc(db, 'users', user.uid));
+                const profile = profileSnapshot.exists() ? profileSnapshot.data() : {};
+                document.getElementById('displayNameInput').value = profile.displayName || user.displayName || '';
+                document.getElementById('userDisplayName').textContent =
+                    `👤 ${profile.displayName || user.displayName || user.email}`;
+                await loadAttendance();
+                scheduleReminders();
+            } catch (error) {
+                console.error(error);
+                appScreen.classList.add('hidden');
+                authScreen.classList.remove('hidden');
+                authError.textContent = 'Không thể tải dữ liệu tài khoản. Vui lòng thử lại.';
+            }
+        });
     </script>
 
 </body>
