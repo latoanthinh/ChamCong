@@ -119,6 +119,40 @@
             transition: all 0.2s ease;
         }
 
+        select {
+            appearance: none;
+            padding-right: 40px;
+            cursor: pointer;
+        }
+
+        .select-wrap {
+            position: relative;
+        }
+
+        .select-wrap::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            right: 16px;
+            width: 8px;
+            height: 8px;
+            border-right: 2px solid var(--text-secondary);
+            border-bottom: 2px solid var(--text-secondary);
+            transform: translateY(-65%) rotate(45deg);
+            pointer-events: none;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .select-wrap:focus-within::after {
+            border-color: var(--primary);
+            transform: translateY(-20%) rotate(225deg);
+        }
+
+        select option {
+            background: #ffffff;
+            color: var(--text-main);
+        }
+
         input:focus,
         select:focus {
             border-color: var(--primary);
@@ -290,6 +324,11 @@
         .status-nghi {
             background: #fee2e2;
             color: #b91c1c;
+        }
+
+        .status-quen {
+            background: #fef3c7;
+            color: #b45309;
         }
 
         .skeleton {
@@ -682,14 +721,17 @@
                 </div>
                 <div class="form-group" style="flex:1;">
                     <label for="reportStatus">Trạng thái</label>
-                    <select id="reportStatus">
-                        <option value="">Tất cả</option>
-                        <option value="Đi làm">Đi làm</option>
-                        <option value="Đi trễ">Đi trễ</option>
-                        <option value="Về sớm">Về sớm</option>
-                        <option value="Nghỉ">Ngày nghỉ</option>
-                        <option value="Thiếu giờ">Thiếu giờ</option>
-                    </select>
+                    <div class="select-wrap">
+                        <select id="reportStatus">
+                            <option value="">Tất cả</option>
+                            <option value="Đi làm">Đi làm</option>
+                            <option value="Đi trễ">Đi trễ</option>
+                            <option value="Về sớm">Về sớm</option>
+                            <option value="Quên chấm công">Quên chấm công</option>
+                            <option value="Nghỉ">Ngày nghỉ</option>
+                            <option value="Thiếu giờ">Thiếu giờ</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </div>
@@ -855,6 +897,53 @@
             return match ? Number(match[1]) * 60 + Number(match[2]) : null;
         }
 
+        function getCurrentVietnamMinutes() {
+            const vietnamParts = new Intl.DateTimeFormat('en-GB', {
+                timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', hour12: false
+            }).formatToParts(new Date());
+            return Number(vietnamParts.find(part => part.type === 'hour').value) * 60
+                + Number(vietnamParts.find(part => part.type === 'minute').value);
+        }
+
+        function getEffectiveStatus(item) {
+            const storedStatus = typeof item.status === 'string' ? item.status : '';
+            if (storedStatus.includes('Nghỉ')) return storedStatus;
+
+            const missingCheckIn = !item.checkIn || item.checkIn === 'Chưa chấm';
+            const missingCheckOut = !item.checkOut || item.checkOut === 'Chưa chấm';
+            if (!missingCheckIn && !missingCheckOut) return storedStatus || 'Không xác định';
+
+            const currentMinutes = getCurrentVietnamMinutes();
+            const isPastDate = item.date < todayStr;
+            const isPastDeadline = item.date === todayStr && (
+                (missingCheckIn && currentMinutes > 12 * 60) ||
+                (missingCheckOut && currentMinutes > 18 * 60 + 30)
+            );
+            return isPastDate || isPastDeadline ? 'Quên chấm công' : storedStatus || 'Không xác định';
+        }
+
+        async function syncExpiredAttendanceStatus() {
+            const currentMinutes = getCurrentVietnamMinutes();
+            const todayRef = doc(getUserAttendanceCollection(), todayStr);
+            const todaySnapshot = await getDoc(todayRef);
+            const todayData = todaySnapshot.exists() ? todaySnapshot.data() : null;
+            const hasLeaveStatus = todayData && typeof todayData.status === 'string' && todayData.status.includes('Nghỉ');
+            const missingCheckIn = !todayData || !todayData.checkIn || todayData.checkIn === 'Chưa chấm';
+            const missingCheckOut = todayData && (!todayData.checkOut || todayData.checkOut === 'Chưa chấm');
+            const missedCheckInDeadline = missingCheckIn && currentMinutes > 12 * 60;
+            const missedCheckOutDeadline = missingCheckOut && currentMinutes > 18 * 60 + 30;
+
+            if (!hasLeaveStatus && (missedCheckInDeadline || missedCheckOutDeadline)) {
+                await setDoc(todayRef, {
+                    date: todayStr,
+                    status: 'Quên chấm công',
+                    checkIn: todayData?.checkIn || 'Chưa chấm',
+                    checkOut: todayData?.checkOut || 'Chưa chấm',
+                    updatedAt: serverTimestamp()
+                }, { merge: true });
+            }
+        }
+
         function roundCheckOutTime(totalMinutes) {
             const roundedMinutes = totalMinutes % 60 < 15
                 ? totalMinutes - (totalMinutes % 60)
@@ -882,7 +971,7 @@
             const status = document.getElementById('reportStatus').value;
             return globalAttendanceData.filter(item => {
                 if (!item || typeof item.date !== 'string') return false;
-                const itemStatus = typeof item.status === 'string' ? item.status : '';
+                const itemStatus = getEffectiveStatus(item);
                 const matchesMonth = !month || item.date.startsWith(month);
                 const matchesStatus = !status
                     || (status === 'Nghỉ' && itemStatus.includes('Nghỉ'))
@@ -902,11 +991,12 @@
             }
             let itemsHtml = '';
             filteredData.forEach(data => {
-                const safeStatus = typeof data.status === 'string' ? data.status : 'Không xác định';
+                const safeStatus = getEffectiveStatus(data);
                 const isLeave = safeStatus.includes('Nghỉ');
                 const isLate = safeStatus === 'Đi trễ';
                 const isEarly = safeStatus.startsWith('Về sớm');
-                let statusClass = isLeave ? 'status-nghi' : isLate ? 'status-trễ' : isEarly ? 'status-som' : 'status-lam';
+                const isForgotten = safeStatus === 'Quên chấm công';
+                let statusClass = isLeave ? 'status-nghi' : isForgotten ? 'status-quen' : isLate ? 'status-trễ' : isEarly ? 'status-som' : 'status-lam';
                 const timeHtml = isLeave
                     ? `<span>Trạng thái: <strong class="time-badge">${escapeHtml(safeStatus)}</strong></span>`
                     : `<span>Vào: <strong class="time-badge">${escapeHtml(data.checkIn || 'Chưa chấm')}</strong></span><span>Ra: <strong class="time-badge">${escapeHtml(data.checkOut || 'Chưa chấm')}</strong></span>`;
@@ -929,6 +1019,10 @@
                 if (existingStatus.includes('Nghỉ')) {
                     btn.disabled = true;
                     btnText.textContent = 'Hôm nay đã ghi nhận nghỉ (1/1)';
+                    return;
+                } else if (existingStatus === 'Quên chấm công') {
+                    btn.disabled = true;
+                    btnText.textContent = 'Hôm nay đã ghi nhận quên chấm công';
                     return;
                 } else if (todayExistingRecord.checkIn && todayExistingRecord.checkIn !== 'Chưa chấm' &&
                     todayExistingRecord.checkOut && todayExistingRecord.checkOut !== 'Chưa chấm') {
@@ -1178,6 +1272,10 @@
                     Swal.fire('Thông báo', 'Hôm nay bạn đã thực hiện ghi nhận nghỉ rồi (chỉ được phép 1 lần).', 'warning');
                     return;
                 }
+                if (existingStatus === 'Quên chấm công') {
+                    Swal.fire('Thông báo', 'Hôm nay đã được ghi nhận là quên chấm công.', 'warning');
+                    return;
+                }
                 if (todayExistingRecord.checkIn && todayExistingRecord.checkIn !== 'Chưa chấm' &&
                     todayExistingRecord.checkOut && todayExistingRecord.checkOut !== 'Chưa chấm') {
                     Swal.fire('Thông báo', 'Bạn đã hoàn tất đủ công vào và công ra trong ngày hôm nay rồi.', 'warning');
@@ -1309,6 +1407,7 @@
             const listDiv = document.getElementById('attendanceList');
 
             try {
+                await syncExpiredAttendanceStatus();
                 const querySnapshot = await getDocs(query(getUserAttendanceCollection(), orderBy('date', 'desc')));
 
                 listDiv.innerHTML = '';
@@ -1334,13 +1433,15 @@
 
                 let itemsHtml = '';
                 globalAttendanceData.forEach((data) => {
-                    const safeStatus = typeof data.status === 'string' ? data.status : 'Không xác định';
+                    const safeStatus = getEffectiveStatus(data);
                     const isLeave = safeStatus.includes('Nghỉ');
                     const isLate = safeStatus === 'Đi trễ';
                     const isEarly = safeStatus.startsWith('Về sớm');
+                    const isForgotten = safeStatus === 'Quên chấm công';
 
                     let statusClass = 'status-lam';
                     if (isLeave) statusClass = 'status-nghi';
+                    else if (isForgotten) statusClass = 'status-quen';
                     else if (isLate) statusClass = 'status-trễ';
                     else if (isEarly) statusClass = 'status-som';
 
@@ -1533,7 +1634,7 @@
             }
             localStorage.setItem(`attendance-reminders-${currentUser.uid}`, 'true');
             scheduleReminders();
-            new Notification('Nhắc chấm công', { body: 'Đã bật nhắc lúc 08:30 và 17:30 khi trang đang mở.' });
+            new Notification('Nhắc chấm công', { body: 'Đã bật nhắc lúc 08:20 và 18:20 khi trang đang mở.' });
             Swal.fire({ icon: 'success', title: 'Đã bật nhắc', text: 'Hãy mở trang vào các khung giờ nhắc để nhận thông báo.', timer: 1800, showConfirmButton: false });
         };
 
@@ -1547,7 +1648,7 @@
                 const hour = parts.find(part => part.type === 'hour').value;
                 const minute = parts.find(part => part.type === 'minute').value;
                 const key = `${todayStr}-${hour}:${minute}`;
-                if ((hour === '08' && minute === '30' || hour === '17' && minute === '30')
+                if ((hour === '08' && minute === '20' || hour === '18' && minute === '20')
                     && localStorage.getItem('last-attendance-reminder') !== key
                     && Notification.permission === 'granted') {
                     localStorage.setItem('last-attendance-reminder', key);
