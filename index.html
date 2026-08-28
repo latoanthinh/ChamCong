@@ -14,6 +14,27 @@
 
 <body>
 
+    <div id="pageLoader" class="page-loader" role="status" aria-live="polite" aria-label="Đang tải">
+        <div class="loader-orbit" aria-hidden="true">
+            <div class="loader-core">
+                <svg class="loader-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="9" y="11" width="30" height="28" rx="6" fill="url(#loaderIconGradient)" />
+                    <path d="M9 19H39" stroke="white" stroke-width="2.5" />
+                    <path d="M16 8V14M32 8V14" stroke="#4F46E5" stroke-width="3" stroke-linecap="round" />
+                    <path class="loader-check" d="M16 28L21 33L32 22" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+                    <defs>
+                        <linearGradient id="loaderIconGradient" x1="9" y1="11" x2="39" y2="39" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#6366F1" />
+                            <stop offset="1" stop-color="#0EA5E9" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+        </div>
+        <strong id="pageLoaderText">Đang chuẩn bị dữ liệu...</strong>
+        <span class="loader-subtitle">Vui lòng chờ trong giây lát <i class="loader-dots" aria-hidden="true"><b></b><b></b><b></b></i></span>
+    </div>
+
     <section id="authScreen" class="container auth-screen">
         <h1>🔐 Đăng nhập sổ chấm công</h1>
         <p>Sử dụng tài khoản được cấp để xem dữ liệu cá nhân.</p>
@@ -56,18 +77,16 @@
             </div>
             <div class="admin-tools">
                 <input id="adminMonth" type="month" aria-label="Tháng báo cáo">
-                <button id="exportAllCsvBtn" type="button" class="btn-secondary">⬇️ Xuất CSV</button>
             </div>
             <div class="form-group">
                 <label for="employeeSearch">Tìm nhân viên</label>
                 <input id="employeeSearch" type="search" placeholder="Tên hoặc email nhân viên">
             </div>
-            <div id="employeeList" class="employee-list">
-                <p style="color:var(--text-secondary);">Đang tải danh sách...</p>
-            </div>
+            <div id="employeeList" class="employee-list" aria-busy="true"></div>
         </section>
 
-        <div id="employeeWorkspace">
+        <div id="employeeWorkspace" class="workspace-layout">
+            <section class="attendance-book">
             <div class="card">
                 <div class="form-group">
                     <label for="displayNameInput">Tên hiển thị</label>
@@ -101,18 +120,54 @@
 
             <div class="btn-group">
                 <button class="btn-secondary" onclick="openReportModal()">📊 Thống Kê & In Ngày Công</button>
-                <button class="btn-secondary" onclick="exportCsv()">⬇️ Xuất CSV</button>
                 <button class="btn-secondary" onclick="enableReminders()">🔔 Bật nhắc chấm công</button>
                 <button class="btn-danger" onclick="confirmClearData()">🗑️ Xóa Dữ Liệu Của Tôi</button>
             </div>
+            </section>
 
-            <div class="card">
-                <div style="display:flex; gap:8px;">
-                    <div class="form-group" style="flex:1;">
+            <section class="attendance-overview">
+                <div class="calendar-card">
+                    <div class="calendar-heading">
+                        <div>
+                            <span class="section-kicker">Lịch cá nhân</span>
+                            <h3>Lịch chấm công</h3>
+                        </div>
+                        <button id="calendarTodayBtn" class="calendar-today-btn" type="button">Hôm nay</button>
+                    </div>
+                    <div class="calendar-toolbar">
+                        <button id="calendarPrevBtn" class="calendar-nav-btn" type="button" aria-label="Tháng trước">‹</button>
+                        <strong id="calendarMonthLabel"></strong>
+                        <button id="calendarNextBtn" class="calendar-nav-btn" type="button" aria-label="Tháng sau">›</button>
+                    </div>
+                    <div class="calendar-weekdays" aria-hidden="true">
+                        <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
+                    </div>
+                    <div id="calendarGrid" class="calendar-grid" role="grid" aria-label="Lịch chấm công"></div>
+                    <div class="calendar-legend">
+                        <span><i class="legend-dot is-work"></i>Đã chấm</span>
+                        <span><i class="legend-dot is-holiday"></i>Ngày lễ</span>
+                        <span><i class="legend-dot is-today"></i>Hôm nay</span>
+                    </div>
+                </div>
+
+                <details class="holiday-notes" open>
+                    <summary><span>🇻🇳</span><strong>Ngày lễ Việt Nam</strong><small>Ghi chú theo quy định</small></summary>
+                    <div class="holiday-note-list">
+                        <div><b>01/01</b><span>Tết Dương lịch</span></div>
+                        <div><b>Tết Âm lịch</b><span>05 ngày nghỉ theo quy định; lịch thực tế có thể được công bố thêm ngày liền kề.</span></div>
+                        <div><b>10/03 Âm lịch</b><span>Giỗ Tổ Hùng Vương</span></div>
+                        <div><b>30/04</b><span>Ngày Chiến thắng</span></div>
+                        <div><b>01/05</b><span>Ngày Quốc tế Lao động</span></div>
+                        <div><b>02/09</b><span>Quốc khánh, gồm ngày 02/09 và 01 ngày liền kề theo thông báo hằng năm.</span></div>
+                    </div>
+                </details>
+
+                <div class="card report-filter">
+                    <div class="form-group">
                         <label for="reportMonth">Tháng</label>
                         <input id="reportMonth" type="month">
                     </div>
-                    <div class="form-group" style="flex:1;">
+                    <div class="form-group">
                         <label for="reportStatus">Trạng thái</label>
                         <div class="select-wrap">
                             <select id="reportStatus">
@@ -127,13 +182,12 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="history-title">Lịch sử gần đây</div>
-            <div class="list" id="attendanceList">
-                <div class="skeleton"></div>
-                <div class="skeleton"></div>
-            </div>
+                <div class="history-panel">
+                    <div class="history-title">Lịch sử gần đây</div>
+                    <div class="list" id="attendanceList" aria-busy="true"></div>
+                </div>
+            </section>
         </div>
     </main>
 

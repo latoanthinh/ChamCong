@@ -51,6 +51,10 @@
             animation: surface-in 0.55s ease both;
         }
 
+        #appScreen {
+            max-width: 980px;
+        }
+
         @keyframes surface-in {
             from { opacity: 0; transform: translateY(14px); }
             to { opacity: 1; transform: translateY(0); }
@@ -226,6 +230,153 @@
             display: none;
         }
 
+        .page-loader {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: var(--text-main);
+            background: rgba(248, 250, 252, 0.72);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            transition: opacity 0.28s ease, visibility 0.28s ease;
+            overflow: hidden;
+        }
+
+        .page-loader::before {
+            content: '';
+            position: absolute;
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.16), transparent 68%);
+            filter: blur(4px);
+            animation: loader-halo 2.4s ease-in-out infinite;
+        }
+
+        .page-loader.is-hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .page-loader strong {
+            position: relative;
+            font-size: 0.95rem;
+            letter-spacing: 0.01em;
+        }
+
+        .loader-subtitle {
+            position: relative;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        .loader-orbit {
+            width: 58px;
+            height: 58px;
+            padding: 3px;
+            border-radius: 50%;
+            background: conic-gradient(from 0deg, var(--primary), #38bdf8, #a5b4fc, var(--primary));
+            animation: loader-spin 1s linear infinite;
+            box-shadow: 0 8px 24px rgba(79, 70, 229, 0.2);
+            position: relative;
+            z-index: 1;
+        }
+
+        .loader-orbit::before,
+        .loader-orbit::after {
+            content: '';
+            position: absolute;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18), 0 0 12px #38bdf8;
+        }
+
+        .loader-orbit::before {
+            top: -2px;
+            left: 15px;
+        }
+
+        .loader-orbit::after {
+            right: -2px;
+            bottom: 12px;
+            width: 5px;
+            height: 5px;
+            background: #a5b4fc;
+        }
+
+        .loader-core {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.92);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+            display: grid;
+            place-items: center;
+            animation: loader-breathe 1.8s ease-in-out infinite;
+        }
+
+        .loader-icon {
+            width: 34px;
+            height: 34px;
+            filter: drop-shadow(0 3px 4px rgba(79, 70, 229, 0.18));
+        }
+
+        .loader-check {
+            stroke-dasharray: 28;
+            stroke-dashoffset: 28;
+            animation: loader-check-draw 1.8s ease-in-out infinite;
+        }
+
+        .loader-dots {
+            display: inline-flex;
+            gap: 3px;
+            margin-left: 3px;
+            vertical-align: middle;
+        }
+
+        .loader-dots b {
+            width: 3px;
+            height: 3px;
+            border-radius: 50%;
+            background: var(--primary);
+            animation: loader-dot 1.2s ease-in-out infinite;
+        }
+
+        .loader-dots b:nth-child(2) { animation-delay: 0.15s; }
+        .loader-dots b:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes loader-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes loader-breathe {
+            0%, 100% { transform: scale(0.94); }
+            50% { transform: scale(1); }
+        }
+
+        @keyframes loader-halo {
+            0%, 100% { opacity: 0.55; transform: scale(0.85); }
+            50% { opacity: 1; transform: scale(1.15); }
+        }
+
+        @keyframes loader-dot {
+            0%, 100% { opacity: 0.3; transform: translateY(0); }
+            50% { opacity: 1; transform: translateY(-2px); }
+        }
+
+        @keyframes loader-check-draw {
+            25%, 75% { stroke-dashoffset: 0; }
+            100% { stroke-dashoffset: -28; }
+        }
+
         @keyframes spin {
             to {
                 transform: rotate(360deg);
@@ -237,6 +388,241 @@
             margin-bottom: 10px;
             color: var(--text-main);
             font-size: 0.95rem;
+        }
+
+        .attendance-overview {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: start;
+            grid-column: 1;
+            grid-row: 1;
+            min-width: 0;
+            padding: 4px;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            background: rgba(248, 250, 252, 0.72);
+        }
+
+        .calendar-card,
+        .holiday-notes {
+            width: 100%;
+            border: 1px solid var(--border-color);
+            border-radius: 13px;
+            background: rgba(255, 255, 255, 0.92);
+        }
+
+        .calendar-card {
+            padding: 14px;
+        }
+
+        .calendar-heading,
+        .calendar-toolbar,
+        .calendar-legend {
+            display: flex;
+            align-items: center;
+        }
+
+        .calendar-heading {
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .section-kicker {
+            display: block;
+            color: var(--primary);
+            font-size: 0.65rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .calendar-heading h3 {
+            margin-top: 2px;
+            color: var(--text-main);
+            font-size: 1rem;
+        }
+
+        .calendar-today-btn {
+            width: auto;
+            padding: 7px 10px;
+            color: var(--primary);
+            background: #eef2ff;
+            box-shadow: none;
+            font-size: 0.72rem;
+        }
+
+        .calendar-today-btn:hover {
+            background: #e0e7ff;
+        }
+
+        .calendar-toolbar {
+            justify-content: space-between;
+            margin-bottom: 12px;
+            color: var(--text-main);
+        }
+
+        .calendar-toolbar strong {
+            font-size: 0.88rem;
+        }
+
+        .calendar-nav-btn {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            background: #fff;
+            box-shadow: none;
+            font-size: 1.3rem;
+            line-height: 1;
+        }
+
+        .calendar-nav-btn:hover {
+            color: var(--primary);
+            background: #f8fafc;
+        }
+
+        .calendar-weekdays,
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 4px;
+        }
+
+        .calendar-weekdays {
+            margin-bottom: 4px;
+            color: var(--text-secondary);
+            font-size: 0.62rem;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .calendar-cell {
+            position: relative;
+            min-height: 34px;
+            padding: 7px 2px 4px;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            color: var(--text-main);
+            font-size: 0.72rem;
+            text-align: center;
+        }
+
+        .calendar-cell.is-empty { pointer-events: none; }
+        .calendar-cell.is-weekend { color: #ef4444; }
+        .calendar-cell.is-today { border-color: var(--primary); font-weight: 800; }
+        .calendar-cell.is-work { background: #dcfce7; color: #15803d; }
+        .calendar-cell.is-holiday { background: #fef3c7; color: #b45309; font-weight: 800; }
+        .calendar-cell.is-today.is-holiday { box-shadow: inset 0 0 0 2px var(--primary); }
+
+        .calendar-cell::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            bottom: 3px;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: transparent;
+            transform: translateX(-50%);
+        }
+
+        .calendar-cell.is-work::after { background: #16a34a; }
+        .calendar-cell.is-holiday::after { background: #f59e0b; }
+
+        .calendar-legend {
+            flex-wrap: wrap;
+            gap: 8px 12px;
+            margin-top: 12px;
+            color: var(--text-secondary);
+            font-size: 0.62rem;
+        }
+
+        .legend-dot {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            margin-right: 4px;
+            border-radius: 50%;
+            background: var(--border-color);
+        }
+
+        .legend-dot.is-work { background: #16a34a; }
+        .legend-dot.is-holiday { background: #f59e0b; }
+        .legend-dot.is-today { background: var(--primary); }
+
+        .holiday-notes summary {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 8px;
+            align-items: center;
+            padding: 11px 12px;
+            cursor: pointer;
+            list-style: none;
+        }
+
+        .holiday-notes summary::-webkit-details-marker { display: none; }
+        .holiday-notes summary > span { font-size: 1.05rem; }
+        .holiday-notes summary strong { font-size: 0.82rem; }
+        .holiday-notes summary small { color: var(--text-secondary); font-size: 0.62rem; }
+
+        .holiday-note-list {
+            display: grid;
+            gap: 7px;
+            padding: 0 12px 12px;
+        }
+
+        .holiday-note-list div {
+            display: grid;
+            grid-template-columns: 70px 1fr;
+            gap: 7px;
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            line-height: 1.35;
+        }
+
+        .holiday-note-list b { color: #b45309; }
+
+        .workspace-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+            gap: 18px;
+            align-items: start;
+        }
+
+        .attendance-book {
+            grid-column: 2;
+            grid-row: 1;
+            min-width: 0;
+        }
+
+        .report-filter {
+            padding: 12px;
+            margin-bottom: 0;
+            width: 100%;
+        }
+
+        .report-filter .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .report-filter label {
+            font-size: 0.7rem;
+            letter-spacing: 0.03em;
+        }
+
+        .report-filter input,
+        .report-filter select {
+            padding: 10px 8px;
+            font-size: 0.85rem;
+        }
+
+        .history-panel {
+            min-width: 0;
+            width: 100%;
+            padding: 8px;
         }
 
         .list {
@@ -326,6 +712,40 @@
             border-radius: 8px;
             height: 50px;
             margin-bottom: 8px;
+        }
+
+        .skeleton-item {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+            min-height: 70px;
+            padding: 12px;
+            margin-bottom: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: #f8fafc;
+        }
+
+        .skeleton-line {
+            height: 11px;
+            margin: 5px 0;
+            border-radius: 6px;
+            background: linear-gradient(90deg, #e2e8f0 25%, #f8fafc 50%, #e2e8f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.4s ease infinite;
+        }
+
+        .skeleton-line.wide { width: 62%; }
+        .skeleton-line.short { width: 42%; }
+
+        .skeleton-pill {
+            align-self: center;
+            width: 70px;
+            height: 24px;
+            border-radius: 20px;
+            background: linear-gradient(90deg, #e2e8f0 25%, #f8fafc 50%, #e2e8f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.4s ease infinite;
         }
 
         @keyframes loading {
@@ -541,6 +961,30 @@
         }
 
         @media (max-width: 420px) {
+            .workspace-layout {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .attendance-overview,
+            .attendance-book {
+                width: 100%;
+            }
+
+            .attendance-overview {
+                order: 1;
+                gap: 8px;
+            }
+
+            .attendance-book {
+                order: 2;
+            }
+
+            .report-filter {
+                padding: 10px 8px;
+            }
+
             .employee-row {
                 grid-template-columns: 1fr;
             }

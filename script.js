@@ -27,6 +27,67 @@
         let employees = [];
         let employeeAttendance = new Map();
 
+        const pageLoader = document.getElementById('pageLoader');
+        const pageLoaderText = document.getElementById('pageLoaderText');
+
+        function showPageLoader(message = 'Đang tải dữ liệu...') {
+            pageLoaderText.textContent = message;
+            pageLoader.classList.remove('is-hidden');
+        }
+
+        function hidePageLoader() {
+            pageLoader.classList.add('is-hidden');
+        }
+
+        function createAttendanceSkeleton() {
+            return Array.from({ length: 3 }, () => `
+                <div class="skeleton-item" aria-hidden="true">
+                    <div>
+                        <div class="skeleton-line wide"></div>
+                        <div class="skeleton-line short"></div>
+                    </div>
+                    <div class="skeleton-pill"></div>
+                </div>
+            `).join('');
+        }
+
+        function createEmployeeSkeleton() {
+            return Array.from({ length: 3 }, () => `
+                <div class="employee-row" aria-hidden="true">
+                    <div>
+                        <div class="skeleton-line wide"></div>
+                        <div class="skeleton-line short"></div>
+                    </div>
+                    <div class="skeleton-pill"></div>
+                </div>
+            `).join('');
+        }
+
+        // Demo request: gọi window.simulateApiRequest() trong Console để xem trạng thái loading.
+        window.simulateApiRequest = function () {
+            const list = document.getElementById('attendanceList');
+            list.setAttribute('aria-busy', 'true');
+            list.innerHTML = createAttendanceSkeleton();
+            showPageLoader('Đang mô phỏng gọi API...');
+
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    list.removeAttribute('aria-busy');
+                    list.innerHTML = `
+                        <div class="item">
+                            <div>
+                                <div class="item-date">📅 ${todayStr}</div>
+                                <div class="item-time"><span>Vào: <strong class="time-badge">08:00</strong></span><span>Ra: <strong class="time-badge">18:30</strong></span></div>
+                            </div>
+                            <span class="item-status status-lam">ĐI LÀM</span>
+                        </div>
+                    `;
+                    hidePageLoader();
+                    resolve({ ok: true, data: [{ date: todayStr, status: 'Đi làm', checkIn: '08:00', checkOut: '18:30' }] });
+                }, 2000);
+            });
+        };
+
         function showAuthError(error) {
             const messages = {
                 'auth/invalid-credential': 'Tên đăng nhập hoặc mật khẩu không đúng.',
@@ -103,7 +164,89 @@
 
         let globalAttendanceData = [];
         let todayExistingRecord = null;
-        const holidays = new Set(['01-01', '04-30', '05-01', '09-02']);
+        const fixedHolidayNames = {
+            '01-01': 'Tết Dương lịch',
+            '04-30': 'Ngày Giải phóng miền Nam',
+            '05-01': 'Ngày Quốc tế Lao động',
+            '09-02': 'Quốc khánh'
+        };
+        const lunarHolidayDates = {
+            2025: {
+                '01-25': 'Tết Nguyên đán', '01-26': 'Tết Nguyên đán', '01-27': 'Tết Nguyên đán',
+                '01-28': 'Tết Nguyên đán', '01-29': 'Tết Nguyên đán', '01-30': 'Tết Nguyên đán',
+                '01-31': 'Tết Nguyên đán', '02-01': 'Tết Nguyên đán', '02-02': 'Tết Nguyên đán',
+                '04-07': 'Giỗ Tổ Hùng Vương'
+            },
+            2026: {
+                '02-14': 'Tết Nguyên đán', '02-15': 'Tết Nguyên đán', '02-16': 'Tết Nguyên đán',
+                '02-17': 'Tết Nguyên đán', '02-18': 'Tết Nguyên đán', '02-19': 'Tết Nguyên đán',
+                '02-20': 'Tết Nguyên đán', '02-21': 'Tết Nguyên đán', '02-22': 'Tết Nguyên đán',
+                '04-26': 'Giỗ Tổ Hùng Vương'
+            },
+            2027: {
+                '02-06': 'Tết Nguyên đán', '02-07': 'Tết Nguyên đán', '02-08': 'Tết Nguyên đán',
+                '02-09': 'Tết Nguyên đán', '02-10': 'Tết Nguyên đán', '02-11': 'Tết Nguyên đán',
+                '02-12': 'Tết Nguyên đán', '02-13': 'Tết Nguyên đán', '02-14': 'Tết Nguyên đán',
+                '04-16': 'Giỗ Tổ Hùng Vương'
+            }
+        };
+
+        function getHolidayInfo(date) {
+            if (typeof date !== 'string' || date.length < 10) return null;
+            const monthDay = date.slice(5);
+            const name = fixedHolidayNames[monthDay] || lunarHolidayDates[date.slice(0, 4)]?.[monthDay];
+            return name ? { name, date } : null;
+        }
+
+        const todayHoliday = getHolidayInfo(todayStr);
+        let calendarCursor = new Date(Number(todayStr.slice(0, 4)), Number(todayStr.slice(5, 7)) - 1, 1);
+
+        function getCalendarDateKey(year, month, day) {
+            return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendarGrid');
+            const label = document.getElementById('calendarMonthLabel');
+            if (!grid || !label) return;
+
+            const year = calendarCursor.getFullYear();
+            const month = calendarCursor.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const mondayFirstOffset = (firstDay.getDay() + 6) % 7;
+            const attendanceDates = new Set(globalAttendanceData.map(item => item?.date));
+            label.textContent = new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric' }).format(firstDay);
+
+            let cells = Array.from({ length: mondayFirstOffset }, () => '<span class="calendar-cell is-empty" aria-hidden="true"></span>');
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = getCalendarDateKey(year, month, day);
+                const holiday = getHolidayInfo(date);
+                const dayOfWeek = new Date(year, month, day).getDay();
+                const classes = ['calendar-cell'];
+                if (dayOfWeek === 0 || dayOfWeek === 6) classes.push('is-weekend');
+                if (attendanceDates.has(date)) classes.push('is-work');
+                if (holiday) classes.push('is-holiday');
+                if (date === todayStr) classes.push('is-today');
+                const labelText = holiday ? `${date}: ${holiday.name}` : `${date}: ${attendanceDates.has(date) ? 'Đã chấm công' : 'Chưa có dữ liệu'}`;
+                cells.push(`<span class="${classes.join(' ')}" role="gridcell" title="${escapeHtml(labelText)}">${day}</span>`);
+            }
+            grid.innerHTML = cells.join('');
+        }
+
+        document.getElementById('calendarPrevBtn').addEventListener('click', () => {
+            calendarCursor.setMonth(calendarCursor.getMonth() - 1);
+            renderCalendar();
+        });
+        document.getElementById('calendarNextBtn').addEventListener('click', () => {
+            calendarCursor.setMonth(calendarCursor.getMonth() + 1);
+            renderCalendar();
+        });
+        document.getElementById('calendarTodayBtn').addEventListener('click', () => {
+            calendarCursor = new Date(Number(todayStr.slice(0, 4)), Number(todayStr.slice(5, 7)) - 1, 1);
+            renderCalendar();
+        });
+        renderCalendar();
 
         function hasMissingTime(item) {
             return !item.checkIn || item.checkIn === 'Chưa chấm' || !item.checkOut || item.checkOut === 'Chưa chấm';
@@ -183,6 +326,29 @@
             return `${hours} giờ ${minutes} phút`;
         }
 
+        function normalizeEarlyLeaveRecord(record) {
+            if (!record || typeof record.status !== 'string' || !record.status.startsWith('Về sớm')) {
+                return { record, changed: false };
+            }
+
+            const checkOutMinutes = parseTime(record.checkOut);
+            if (checkOutMinutes === null) return { record, changed: false };
+
+            const roundedCheckOut = roundCheckOutTime(checkOutMinutes);
+            const standardOutMinutes = 18 * 60 + 30;
+            const normalizedStatus = roundedCheckOut.minutes < standardOutMinutes
+                ? `Về sớm ${getEarlyLeaveText(standardOutMinutes - roundedCheckOut.minutes)}`
+                : 'Đi làm';
+            const normalizedRecord = {
+                ...record,
+                checkOut: roundedCheckOut.text,
+                status: normalizedStatus
+            };
+            const changed = normalizedRecord.checkOut !== record.checkOut
+                || normalizedRecord.status !== record.status;
+            return { record: normalizedRecord, changed };
+        }
+
         function getFilteredData() {
             const month = document.getElementById('reportMonth').value;
             const status = document.getElementById('reportStatus').value;
@@ -206,8 +372,9 @@
                 listDiv.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px;">Không có dữ liệu phù hợp.</p>';
                 return;
             }
+            const recentData = filteredData.slice(0, 4);
             let itemsHtml = '';
-            filteredData.forEach(data => {
+            recentData.forEach(data => {
                 const safeStatus = getEffectiveStatus(data);
                 const isLeave = safeStatus.includes('Nghỉ');
                 const isLate = safeStatus === 'Đi trễ';
@@ -217,7 +384,7 @@
                 const timeHtml = isLeave
                     ? `<span>Trạng thái: <strong class="time-badge">${escapeHtml(safeStatus)}</strong></span>`
                     : `<span>Vào: <strong class="time-badge">${escapeHtml(data.checkIn || 'Chưa chấm')}</strong></span><span>Ra: <strong class="time-badge">${escapeHtml(data.checkOut || 'Chưa chấm')}</strong></span>`;
-                itemsHtml += `<div class="item"><div><div class="item-date">📅 ${escapeHtml(data.date)}${holidays.has(data.date.slice(5)) ? ' 🎉' : ''}</div><div class="item-time">${timeHtml}</div></div><span class="item-status ${statusClass}">${escapeHtml(safeStatus)}</span></div>`;
+                itemsHtml += `<div class="item"><div><div class="item-date">📅 ${escapeHtml(data.date)}${getHolidayInfo(data.date) ? ' 🎉' : ''}</div><div class="item-time">${timeHtml}</div></div><span class="item-status ${statusClass}">${escapeHtml(safeStatus)}</span></div>`;
             });
             listDiv.innerHTML = itemsHtml;
         }
@@ -229,6 +396,13 @@
             const statusVal = document.getElementById('status').value;
             const btn = document.getElementById('saveBtn');
             const btnText = document.getElementById('btnText');
+
+            if (todayHoliday) {
+                btn.disabled = true;
+                btn.classList.remove('is-leave');
+                btnText.textContent = `Nghỉ lễ: ${todayHoliday.name}`;
+                return;
+            }
 
             // Kiểm tra xem hôm nay đã hoàn tất thao tác chưa để khóa nút
             if (todayExistingRecord) {
@@ -330,7 +504,9 @@
 
         async function loadEmployees() {
             const list = document.getElementById('employeeList');
-            list.innerHTML = '<div class="admin-loading-row"></div><div class="admin-loading-row"></div><div class="admin-loading-row"></div>';
+            showPageLoader('Đang tải danh sách nhân viên...');
+            list.setAttribute('aria-busy', 'true');
+            list.innerHTML = createEmployeeSkeleton();
             try {
                 const snapshot = await getDocs(collection(db, 'users'));
                 employees = snapshot.docs.map(employeeDoc => ({ uid: employeeDoc.id, ...employeeDoc.data() }))
@@ -346,6 +522,9 @@
             } catch (error) {
                 console.error(error);
                 list.innerHTML = '<p style="color:var(--danger);">Không thể tải danh sách nhân viên. Hãy kiểm tra Firestore Rules.</p>';
+            } finally {
+                list.removeAttribute('aria-busy');
+                hidePageLoader();
             }
         }
 
@@ -378,28 +557,6 @@
                 confirmButtonText: 'Đóng',
                 width: 640
             });
-        }
-
-        function exportAllEmployeesCsv() {
-            const month = document.getElementById('adminMonth').value;
-            const rows = [['Nhân viên', 'Email', 'Ngày', 'Trạng thái', 'Giờ vào', 'Giờ ra']];
-            employees.forEach(employee => {
-                (employeeAttendance.get(employee.uid) || []).filter(record => !month || String(record.date || '').startsWith(month))
-                    .forEach(record => rows.push([
-                        employee.displayName || 'Chưa đặt tên', employee.email || '', record.date || '',
-                        record.status || '', record.checkIn || 'Chưa chấm', record.checkOut || 'Chưa chấm'
-                    ]));
-            });
-            if (rows.length === 1) {
-                Swal.fire('Trống', 'Không có dữ liệu chấm công để xuất.', 'info');
-                return;
-            }
-            const csv = rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\r\n');
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }));
-            link.download = `bao-cao-nhan-vien-${month || todayStr}.csv`;
-            link.click();
-            URL.revokeObjectURL(link.href);
         }
 
         async function editEmployee(uid) {
@@ -452,7 +609,6 @@
         document.getElementById('employeeSearch').addEventListener('input', renderEmployees);
         document.getElementById('refreshEmployeesBtn').addEventListener('click', loadEmployees);
         document.getElementById('adminMonth').value = todayStr.slice(0, 7);
-        document.getElementById('exportAllCsvBtn').addEventListener('click', exportAllEmployeesCsv);
 
         window.saveAttendance = async function () {
             const date = dateInput.value;
@@ -462,6 +618,16 @@
                 Swal.fire({
                     icon: 'warning',
                     title: 'Chỉ được phép thao tác hôm nay!',
+                    confirmButtonColor: '#4f46e5'
+                });
+                return;
+            }
+
+            if (todayHoliday) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Hôm nay được nghỉ lễ',
+                    text: `${todayHoliday.name} theo quy định nghỉ lễ của Nhà nước.`,
                     confirmButtonColor: '#4f46e5'
                 });
                 return;
@@ -622,6 +788,9 @@
 
         async function loadAttendance() {
             const listDiv = document.getElementById('attendanceList');
+            showPageLoader('Đang tải lịch sử chấm công...');
+            listDiv.setAttribute('aria-busy', 'true');
+            listDiv.innerHTML = createAttendanceSkeleton();
 
             try {
                 await syncExpiredAttendanceStatus();
@@ -637,14 +806,34 @@
                     return;
                 }
 
+                const migrationBatches = [];
+                let migrationBatch = writeBatch(db);
+                let migrationCount = 0;
                 querySnapshot.forEach((documentSnap) => {
                     const data = documentSnap.data();
-                    globalAttendanceData.push(data);
+                    const normalized = normalizeEarlyLeaveRecord(data);
+                    globalAttendanceData.push(normalized.record);
 
-                    if (data.date === todayStr) {
-                        todayExistingRecord = data;
+                    if (normalized.changed) {
+                        migrationBatch.set(documentSnap.ref, {
+                            checkOut: normalized.record.checkOut,
+                            status: normalized.record.status,
+                            updatedAt: serverTimestamp()
+                        }, { merge: true });
+                        migrationCount++;
+                        if (migrationCount === 450) {
+                            migrationBatches.push(migrationBatch.commit());
+                            migrationBatch = writeBatch(db);
+                            migrationCount = 0;
+                        }
+                    }
+
+                    if (normalized.record.date === todayStr) {
+                        todayExistingRecord = normalized.record;
                     }
                 });
+                if (migrationCount > 0) migrationBatches.push(migrationBatch.commit());
+                if (migrationBatches.length) await Promise.all(migrationBatches);
 
                 globalAttendanceData.sort((a, b) => b.date.localeCompare(a.date));
 
@@ -696,6 +885,7 @@
 
                 updateButtonState();
                 renderAttendanceList();
+                renderCalendar();
                 preparePrintData();
                 localStorage.setItem(`attendance-cache-${currentUser.uid}`, JSON.stringify(globalAttendanceData));
             } catch (e) {
@@ -704,10 +894,14 @@
                 if (cached) {
                     globalAttendanceData = JSON.parse(cached);
                     renderAttendanceList();
+                    renderCalendar();
                     preparePrintData();
                 } else {
                     listDiv.innerHTML = '<p style="text-align: center; color: #ef4444; padding: 20px; font-size: 0.9rem;">Không thể tải dữ liệu.</p>';
                 }
+            } finally {
+                listDiv.removeAttribute('aria-busy');
+                hidePageLoader();
             }
         }
 
@@ -820,25 +1014,6 @@
             });
         };
 
-        window.exportCsv = function () {
-            const data = [...getFilteredData()].sort((a, b) => a.date.localeCompare(b.date));
-            if (data.length === 0) {
-                Swal.fire('Trống', 'Không có dữ liệu phù hợp để xuất.', 'info');
-                return;
-            }
-            const header = ['STT', 'Ngày', 'Trạng thái', 'Giờ vào', 'Giờ ra'];
-            const rows = data.map((item, index) => [
-                index + 1, item.date, item.status || '', item.checkIn || 'Chưa chấm', item.checkOut || 'Chưa chấm'
-            ]);
-            const csv = [header, ...rows].map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\r\n');
-            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `bao-cao-cham-cong-${todayStr}.csv`;
-            link.click();
-            URL.revokeObjectURL(link.href);
-        };
-
         window.enableReminders = async function () {
             if (!('Notification' in window)) {
                 Swal.fire('Không hỗ trợ', 'Trình duyệt này không hỗ trợ thông báo.', 'info');
@@ -911,11 +1086,13 @@
         };
 
         onAuthStateChanged(auth, async (user) => {
+            showPageLoader(user ? 'Đang tải dữ liệu tài khoản...' : 'Đang kiểm tra phiên đăng nhập...');
             currentUser = user;
             if (!user) {
                 authScreen.classList.remove('hidden');
                 appScreen.classList.add('hidden');
                 attendanceCollection = null;
+                hidePageLoader();
                 return;
             }
 
@@ -943,5 +1120,7 @@
                 appScreen.classList.add('hidden');
                 authScreen.classList.remove('hidden');
                 authError.textContent = 'Không thể tải dữ liệu tài khoản. Vui lòng thử lại.';
+            } finally {
+                hidePageLoader();
             }
         });
