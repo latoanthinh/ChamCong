@@ -489,6 +489,8 @@
             display: grid;
             grid-template-columns: repeat(7, minmax(0, 1fr));
             gap: 4px;
+            width: 100%;
+            min-width: 0;
         }
 
         .calendar-weekdays {
@@ -501,6 +503,12 @@
 
         .calendar-cell {
             position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            min-width: 0;
             min-height: 48px;
             padding: 5px 2px 3px;
             border: 1px solid transparent;
@@ -508,6 +516,8 @@
             color: var(--text-main);
             font-size: 0.9rem;
             text-align: center;
+            background: transparent;
+            box-shadow: none;
         }
 
         .calendar-cell.is-empty { pointer-events: none; }
@@ -1024,6 +1034,32 @@
 
             .attendance-book {
                 order: 2;
+            }
+
+            .calendar-card {
+                padding: 10px 8px 12px;
+            }
+
+            .calendar-grid {
+                gap: 3px;
+            }
+
+            .calendar-cell {
+                min-height: 52px;
+                padding: 4px 1px 3px;
+                font-size: 0.78rem;
+            }
+
+            .calendar-weekdays span {
+                font-size: 0.62rem;
+            }
+
+            .solar-day {
+                font-size: 0.95em;
+            }
+
+            .lunar-day {
+                font-size: 0.56rem;
             }
 
             .report-filter {
