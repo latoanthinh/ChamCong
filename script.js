@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs, getDoc, setDoc, doc, query, orderBy, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, getDoc, setDoc, doc, query, orderBy, writeBatch, serverTimestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -136,6 +136,28 @@ loginForm.addEventListener('submit', async (event) => {
 });
 
 document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
+
+// Dark Mode Toggle
+function initializeDarkMode() {
+    const darkModeEnabled = localStorage.getItem('attendance-dark-mode') === 'true';
+    const darkModeBtn = document.getElementById('darkModeBtn');
+    
+    if (darkModeEnabled) {
+        document.body.classList.add('dark-mode');
+        if (darkModeBtn) darkModeBtn.textContent = '☀️';
+    }
+    
+    if (darkModeBtn) {
+        darkModeBtn.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            const isDarkMode = document.body.classList.contains('dark-mode');
+            localStorage.setItem('attendance-dark-mode', isDarkMode);
+            darkModeBtn.textContent = isDarkMode ? '☀️' : '🌙';
+        });
+    }
+}
+
+initializeDarkMode();
 
 function getUserAttendanceCollection() {
     if (!currentUser) throw new Error('Chưa đăng nhập');
@@ -554,6 +576,17 @@ function renderAttendanceList() {
 document.getElementById('reportMonth').addEventListener('change', renderAttendanceList);
 document.getElementById('reportStatus').addEventListener('change', renderAttendanceList);
 
+window.printOldMonthReport = function () {
+    if (getFilteredData().length === 0) {
+        Swal.fire('Trống', 'Chưa có dữ liệu để tổng hợp báo cáo tháng này.', 'info');
+        return;
+    }
+    preparePrintData();
+    window.print();
+};
+
+document.getElementById('printOldMonthBtn').addEventListener('click', printOldMonthReport);
+
 window.updateButtonState = function () {
     const statusVal = document.getElementById('status').value;
     const btn = document.getElementById('saveBtn');
@@ -813,8 +846,10 @@ window.saveAttendance = async function () {
     // Kiểm tra trạng thái nếu hôm nay đã tồn tại bản ghi
     if (todayExistingRecord) {
         const existingStatus = typeof todayExistingRecord.status === 'string' ? todayExistingRecord.status : '';
-        if (existingStatus.includes('Nghỉ')) {
-            Swal.fire('Thông báo', 'Hôm nay bạn đã thực hiện ghi nhận nghỉ rồi (chỉ được phép 1 lần).', 'warning');
+        
+        // Nếu đã chấm nghỉ nhưng chuyển sang "Đi làm", cho phép đổi lại
+        if (existingStatus.includes('Nghỉ') && !isLeaveStatus) {
+            Swal.fire('Thông báo', 'Bạn đã chấm nghỉ hôm nay. Vui lòng xóa record rồi chấm lại.', 'warning');
             return;
         }
         if (existingStatus === 'Quên chấm công') {
@@ -1043,6 +1078,25 @@ async function loadAttendance() {
             } else {
                 statusSelect.value = todayExistingRecord.status;
             }
+            // Hiển thị nút cập nhật trạng thái nếu đã có record hôm nay
+            const updateBtn = document.getElementById('updateStatusBtn');
+            const resetBtn = document.getElementById('resetTodayBtn');
+            if (updateBtn && todayExistingRecord) {
+                updateBtn.style.display = 'block';
+            }
+            if (resetBtn) {
+                resetBtn.style.display = 'none';
+            }
+        } else {
+            // Ẩn nút cập nhật nếu không có record hôm nay
+            const updateBtn = document.getElementById('updateStatusBtn');
+            const resetBtn = document.getElementById('resetTodayBtn');
+            if (updateBtn) {
+                updateBtn.style.display = 'none';
+            }
+            if (resetBtn) {
+                resetBtn.style.display = 'none';
+            }
         }
 
         updateButtonState();
@@ -1176,6 +1230,101 @@ window.openReportModal = function () {
     });
 };
 
+window.updateStatus = async function () {
+    const newStatus = document.getElementById('status').value;
+    const currentStatus = todayExistingRecord ? todayExistingRecord.status : '';
+    
+    if (newStatus === currentStatus) {
+        Swal.fire('Thông báo', 'Trạng thái không thay đổi.', 'info');
+        return;
+    }
+    
+    Swal.fire({
+        title: 'Cập nhật trạng thái',
+        text: `Thay đổi từ "${currentStatus}" sang "${newStatus}"?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#4f46e5',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Xác nhận',
+        cancelButtonText: 'Hủy'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            try {
+                showPageLoader('Đang cập nhật trạng thái...');
+                const todayRef = doc(getUserAttendanceCollection(), todayStr);
+                
+                await setDoc(todayRef, {
+                    status: newStatus,
+                    updatedAt: serverTimestamp()
+                }, { merge: true });
+                
+                todayExistingRecord.status = newStatus;
+                await loadAttendance();
+                
+                Swal.fire('Thành công!', `Trạng thái đã cập nhật: ${newStatus}`, 'success');
+            } catch (e) {
+                console.error(e);
+                hidePageLoader();
+                Swal.fire('Lỗi', 'Không thể cập nhật trạng thái.', 'error');
+            }
+        }
+    });
+};
+
+window.resetTodayRecord = async function () {
+    Swal.fire({
+        title: 'Xác nhận xóa',
+        text: 'Bạn chắc chắn muốn xóa record hôm nay? Sau đó bạn có thể chấm lại.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Xác nhận',
+        cancelButtonText: 'Hủy'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            try {
+                showPageLoader('Xóa record hôm nay...');
+                const todayDocRef = doc(getUserAttendanceCollection(), todayStr);
+                await deleteDoc(todayDocRef);
+                
+                // Reset dữ liệu và UI
+                todayExistingRecord = null;
+                globalAttendanceData = globalAttendanceData.filter(item => item.date !== todayStr);
+                
+                // Reset status dropdown về "Đi làm"
+                document.getElementById('status').value = 'Đi làm';
+                
+                // Ẩn nút xóa và update
+                const resetBtn = document.getElementById('resetTodayBtn');
+                const updateBtn = document.getElementById('updateStatusBtn');
+                if (resetBtn) {
+                    resetBtn.style.display = 'none';
+                }
+                if (updateBtn) {
+                    updateBtn.style.display = 'none';
+                }
+                
+                // Enable lại nút save
+                updateButtonState();
+                
+                // Refresh UI
+                renderAttendanceList();
+                renderCalendar();
+                preparePrintData();
+                
+                hidePageLoader();
+                Swal.fire('Thành công!', 'Record hôm nay đã bị xóa. Bạn có thể chấm lại.', 'success');
+            } catch (e) {
+                console.error(e);
+                hidePageLoader();
+                Swal.fire('Lỗi', 'Không thể xóa record.', 'error');
+            }
+        }
+    });
+};
+
 window.enableReminders = async function () {
     if (!('Notification' in window)) {
         Swal.fire('Không hỗ trợ', 'Trình duyệt này không hỗ trợ thông báo.', 'info');
@@ -1211,33 +1360,84 @@ function scheduleReminders() {
     }, 30000);
 }
 
+function getAvailableMonths() {
+    const months = new Set();
+    globalAttendanceData.forEach(record => {
+        if (record && record.date) {
+            const monthKey = record.date.slice(0, 7);
+            months.add(monthKey);
+        }
+    });
+    return Array.from(months).sort().reverse();
+}
+
 window.confirmClearData = function () {
+    const availableMonths = getAvailableMonths();
+    
+    if (availableMonths.length === 0) {
+        Swal.fire('Không có dữ liệu', 'Không có dữ liệu nào để xóa.', 'info');
+        return;
+    }
+
+    const monthOptions = availableMonths.map(month => {
+        const [year, monthNum] = month.split('-');
+        const monthName = new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric' })
+            .format(new Date(year, parseInt(monthNum) - 1));
+        return { value: month, text: monthName };
+    });
+
+    let selectedMonth = availableMonths[0];
+
     Swal.fire({
-        title: 'Bạn có chắc chắn muốn xóa?',
-        text: "Hành động này chỉ xóa lịch sử chấm công của tài khoản đang đăng nhập!",
+        title: 'Xóa Dữ Liệu Chấm Công',
+        html: `
+            <div style="text-align: left; margin: 20px 0;">
+                <p style="margin-bottom: 10px;"><strong>Chọn tháng muốn xóa:</strong></p>
+                <select id="clearMonthSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem;">
+                    ${monthOptions.map(opt => `<option value="${opt.value}">${opt.text}</option>`).join('')}
+                </select>
+                <p style="color: #ef4444; margin-top: 15px; font-size: 0.9rem;">⚠️ Hành động này chỉ xóa dữ liệu của tháng được chọn!</p>
+            </div>
+        `,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
         cancelButtonColor: '#64748b',
         confirmButtonText: 'Xác nhận xóa',
-        cancelButtonText: 'Hủy bỏ'
+        cancelButtonText: 'Hủy bỏ',
+        didOpen: () => {
+            const select = document.getElementById('clearMonthSelect');
+            select.addEventListener('change', (e) => {
+                selectedMonth = e.target.value;
+            });
+        }
     }).then(async (result) => {
         if (result.isConfirmed) {
             try {
                 const querySnapshot = await getDocs(getUserAttendanceCollection());
                 const batches = [];
                 let batch = writeBatch(db);
+                let deleteCount = 0;
+                
                 querySnapshot.docs.forEach((record, index) => {
-                    batch.delete(record.ref);
-                    if ((index + 1) % 450 === 0) {
-                        batches.push(batch.commit());
-                        batch = writeBatch(db);
+                    const recordData = record.data();
+                    if (recordData.date && recordData.date.startsWith(selectedMonth)) {
+                        batch.delete(record.ref);
+                        deleteCount++;
+                        if (deleteCount % 450 === 0) {
+                            batches.push(batch.commit());
+                            batch = writeBatch(db);
+                        }
                     }
                 });
-                if (querySnapshot.docs.length % 450 !== 0) batches.push(batch.commit());
-                await Promise.all(batches);
+                
+                if (deleteCount % 450 !== 0 && deleteCount > 0) batches.push(batch.commit());
+                if (batches.length > 0) await Promise.all(batches);
 
-                Swal.fire('Đã xóa!', 'Dữ liệu đã được xóa sạch.', 'success');
+                const monthName = new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric' })
+                    .format(new Date(selectedMonth.split('-')[0], parseInt(selectedMonth.split('-')[1]) - 1));
+                
+                Swal.fire('Đã xóa!', `Dữ liệu tháng ${monthName} đã được xóa (${deleteCount} ngày).`, 'success');
                 await loadAttendance();
             } catch (e) {
                 console.error(e);

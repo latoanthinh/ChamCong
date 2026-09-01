@@ -59,8 +59,11 @@
     <main id="appScreen" class="container hidden">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:16px;">
             <strong id="userDisplayName"></strong>
-            <button id="logoutBtn" type="button" class="btn-danger" style="width:auto; padding:8px 12px;">Đăng
-                xuất</button>
+            <div style="display: flex; gap: 6px;">
+                <button id="darkModeBtn" type="button" class="btn-secondary" style="width:auto; padding:8px 10px; font-size: 1.1rem;" title="Chế độ tối">🌙</button>
+                <button id="logoutBtn" type="button" class="btn-danger" style="width:auto; padding:8px 12px;">Đăng
+                    xuất</button>
+            </div>
         </div>
         <h2 id="appTitle">📅 Sổ Chấm Công Cá Nhân</h2>
 
@@ -109,13 +112,18 @@
                         <option value="Đi làm">Đi làm</option>
                         <option value="Nghỉ phép">Nghỉ phép</option>
                         <option value="Nghỉ không lương">Nghỉ không lương</option>
+                        <option value="Nghỉ Lễ">Nghỉ Lễ</option>
                     </select>
                 </div>
 
-                <button id="saveBtn" onclick="saveAttendance()">
-                    <div class="spinner" id="btnSpinner"></div>
-                    <span id="btnText">Ghi Nhận Giờ Công</span>
-                </button>
+                <div style="display: flex; gap: 8px;">
+                    <button id="saveBtn" onclick="saveAttendance()" style="flex: 1;">
+                        <div class="spinner" id="btnSpinner"></div>
+                        <span id="btnText">Ghi Nhận Giờ Công</span>
+                    </button>
+                    <button id="updateStatusBtn" type="button" class="btn-secondary" style="width: auto; padding: 8px 12px; display: none;" onclick="updateStatus()">✏️ Cập Nhật Trạng Thái</button>
+                    <button id="resetTodayBtn" type="button" class="btn-secondary" style="width: auto; padding: 8px 12px; display: none;" onclick="resetTodayRecord()">🗑️ Xóa Record</button>
+                </div>
             </div>
 
             <div class="btn-group">
@@ -150,31 +158,13 @@
                     </div>
                 </div>
 
-                <details class="holiday-notes" open>
-                    <summary><span>🇻🇳</span><strong>Ngày lễ Việt Nam</strong><small>Âm lịch & quy định</small></summary>
-                    <div class="holiday-note-list">
-                        <div><b>01/01</b><span><strong>Tết Dương lịch</strong><small>Ngày nghỉ hưởng lương theo luật.</small></span></div>
-                        <div><b>01/01 ÂL</b><span><strong>Tết Nguyên đán</strong><small>05 ngày nghỉ; lịch dương cụ thể được công bố hằng năm.</small></span></div>
-                        <div><b>10/03 ÂL</b><span><strong>Giỗ Tổ Hùng Vương</strong><small>Ngày nghỉ hưởng lương, tưởng nhớ các Vua Hùng.</small></span></div>
-                        <div><b>30/04</b><span><strong>Ngày Chiến thắng</strong><small>Ngày nghỉ hưởng lương.</small></span></div>
-                        <div><b>01/05</b><span><strong>Ngày Quốc tế Lao động</strong><small>Ngày nghỉ hưởng lương.</small></span></div>
-                        <div><b>02/09</b><span><strong>Quốc khánh</strong><small>02/09 và 01 ngày liền kề theo thông báo hằng năm.</small></span></div>
-                        <div><b>15/01 ÂL</b><span><strong>Rằm tháng Giêng</strong><small>Lễ truyền thống, không phải ngày nghỉ bắt buộc.</small></span></div>
-                        <div><b>15/04 ÂL</b><span><strong>Phật Đản</strong><small>Ngày lễ Phật giáo phổ biến.</small></span></div>
-                        <div><b>15/07 ÂL</b><span><strong>Vu Lan</strong><small>Dịp tri ân cha mẹ và tổ tiên.</small></span></div>
-                        <div><b>15/08 ÂL</b><span><strong>Tết Trung thu</strong><small>Tết Thiếu nhi và ngày hội trăng rằm.</small></span></div>
-                        <div><b>23/12 ÂL</b><span><strong>Ông Công, Ông Táo</strong><small>Phong tục tiễn Táo quân về trời.</small></span></div>
-                        <div><b>08/03 · 20/10</b><span><strong>Ngày Phụ nữ</strong><small>Quốc tế Phụ nữ và Phụ nữ Việt Nam.</small></span></div>
-                        <div><b>01/06 · 20/11</b><span><strong>Thiếu nhi · Nhà giáo</strong><small>Các ngày kỷ niệm phổ biến, không phải ngày nghỉ bắt buộc.</small></span></div>
-                        <div><b>24–25/12</b><span><strong>Giáng sinh (Noel)</strong><small>Ngày lễ văn hóa và tôn giáo phổ biến, không phải ngày nghỉ bắt buộc.</small></span></div>
-                        <div><b>27/07 · 22/12</b><span><strong>Thương binh - Liệt sĩ · Quân đội</strong><small>Ngày kỷ niệm, tri ân và giáo dục truyền thống.</small></span></div>
-                    </div>
-                </details>
-
                 <div class="card report-filter">
                     <div class="form-group">
                         <label for="reportMonth">Tháng</label>
-                        <input id="reportMonth" type="month">
+                        <div style="display: flex; gap: 8px; align-items: flex-end;">
+                            <input id="reportMonth" type="month" style="flex: 1;">
+                            <button id="printOldMonthBtn" type="button" class="btn-secondary" style="width: auto; padding: 8px 12px; white-space: nowrap;">🖨️ In Báo Cáo</button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="reportStatus">Trạng thái</label>
@@ -187,6 +177,7 @@
                                 <option value="Quên chấm công">Quên chấm công</option>
                                 <option value="Nghỉ">Ngày nghỉ</option>
                                 <option value="Thiếu giờ">Thiếu giờ</option>
+                                <option value="Nghỉ Lễ">Nghỉ Lễ</option>
                             </select>
                         </div>
                     </div>
