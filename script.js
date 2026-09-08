@@ -1146,22 +1146,12 @@ async function loadAttendance() {
             } else {
                 statusSelect.value = todayExistingRecord.status;
             }
-            // Hiển thị nút cập nhật trạng thái nếu đã có record hôm nay
-            const updateBtn = document.getElementById('updateStatusBtn');
             const resetBtn = document.getElementById('resetTodayBtn');
-            if (updateBtn && todayExistingRecord) {
-                updateBtn.style.display = 'block';
-            }
             if (resetBtn) {
                 resetBtn.style.display = 'none';
             }
         } else {
-            // Ẩn nút cập nhật nếu không có record hôm nay
-            const updateBtn = document.getElementById('updateStatusBtn');
             const resetBtn = document.getElementById('resetTodayBtn');
-            if (updateBtn) {
-                updateBtn.style.display = 'none';
-            }
             if (resetBtn) {
                 resetBtn.style.display = 'none';
             }
@@ -1298,48 +1288,6 @@ window.openReportModal = function () {
     });
 };
 
-window.updateStatus = async function () {
-    const newStatus = document.getElementById('status').value;
-    const currentStatus = todayExistingRecord ? todayExistingRecord.status : '';
-    
-    if (newStatus === currentStatus) {
-        Swal.fire('Thông báo', 'Trạng thái không thay đổi.', 'info');
-        return;
-    }
-    
-    Swal.fire({
-        title: 'Cập nhật trạng thái',
-        text: `Thay đổi từ "${currentStatus}" sang "${newStatus}"?`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#4f46e5',
-        cancelButtonColor: '#64748b',
-        confirmButtonText: 'Xác nhận',
-        cancelButtonText: 'Hủy'
-    }).then(async (result) => {
-        if (result.isConfirmed) {
-            try {
-                showPageLoader('Đang cập nhật trạng thái...');
-                const todayRef = doc(getUserAttendanceCollection(), todayStr);
-                
-                await setDoc(todayRef, {
-                    status: newStatus,
-                    updatedAt: serverTimestamp()
-                }, { merge: true });
-                
-                todayExistingRecord.status = newStatus;
-                await loadAttendance();
-                
-                Swal.fire('Thành công!', `Trạng thái đã cập nhật: ${newStatus}`, 'success');
-            } catch (e) {
-                console.error(e);
-                hidePageLoader();
-                Swal.fire('Lỗi', 'Không thể cập nhật trạng thái.', 'error');
-            }
-        }
-    });
-};
-
 window.resetTodayRecord = async function () {
     Swal.fire({
         title: 'Xác nhận xóa',
@@ -1366,12 +1314,8 @@ window.resetTodayRecord = async function () {
                 
                 // Ẩn nút xóa và update
                 const resetBtn = document.getElementById('resetTodayBtn');
-                const updateBtn = document.getElementById('updateStatusBtn');
                 if (resetBtn) {
                     resetBtn.style.display = 'none';
-                }
-                if (updateBtn) {
-                    updateBtn.style.display = 'none';
                 }
                 
                 // Enable lại nút save
