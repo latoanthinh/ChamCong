@@ -329,7 +329,6 @@
             padding: 3px;
             border-radius: 50%;
             background: conic-gradient(from 0deg, var(--primary), #38bdf8, #a5b4fc, var(--primary));
-            animation: loader-spin 1s linear infinite;
             box-shadow: 0 8px 24px rgba(79, 70, 229, 0.2);
             position: relative;
             z-index: 1;
@@ -399,10 +398,6 @@
 
         .loader-dots b:nth-child(2) { animation-delay: 0.15s; }
         .loader-dots b:nth-child(3) { animation-delay: 0.3s; }
-
-        @keyframes loader-spin {
-            to { transform: rotate(360deg); }
-        }
 
         @keyframes loader-breathe {
             0%, 100% { transform: scale(0.94); }
@@ -958,7 +953,7 @@
 
         .admin-summary {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(6, minmax(0, 1fr));
             gap: 8px;
             margin-bottom: 14px;
         }
@@ -989,8 +984,45 @@
         }
 
         .admin-tools input,
+        .admin-tools select,
         .admin-tools button {
             flex: 1;
+        }
+
+        .admin-tools select {
+            min-width: 0;
+            padding: 10px;
+            border: 1.5px solid var(--border-color);
+            border-radius: 10px;
+            background: #fff;
+            color: var(--text-main);
+        }
+
+        .attendance-edit-popup {
+            max-width: calc(100vw - 24px) !important;
+            overflow-x: hidden !important;
+        }
+
+        .attendance-edit-popup .swal2-html-container {
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        @media (max-width: 700px) {
+            .admin-summary {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .admin-tools {
+                flex-wrap: wrap;
+            }
+
+            .admin-tools input,
+            .admin-tools select {
+                flex: 1 1 180px;
+            }
         }
 
         @media (max-width: 420px) {

@@ -77,9 +77,21 @@
                 <div class="admin-stat"><strong id="totalEmployees">0</strong><span>Tổng nhân viên</span></div>
                 <div class="admin-stat"><strong id="activeEmployees">0</strong><span>Đang hoạt động</span></div>
                 <div class="admin-stat"><strong id="checkedEmployees">0</strong><span>Đã chấm hôm nay</span></div>
+                <div class="admin-stat"><strong id="lateEmployees">0</strong><span>Đi trễ</span></div>
+                <div class="admin-stat"><strong id="missingEmployees">0</strong><span>Thiếu công</span></div>
+                <div class="admin-stat"><strong id="leaveEmployees">0</strong><span>Đang nghỉ</span></div>
             </div>
             <div class="admin-tools">
                 <input id="adminMonth" type="month" aria-label="Tháng báo cáo">
+                <select id="adminStatusFilter" aria-label="Lọc trạng thái">
+                    <option value="">Tất cả trạng thái</option>
+                    <option value="Đi làm">Đi làm</option>
+                    <option value="Đi trễ">Đi trễ</option>
+                    <option value="Về sớm">Về sớm</option>
+                    <option value="Nghỉ">Nghỉ</option>
+                    <option value="Quên chấm công">Quên chấm công</option>
+                    <option value="Thiếu giờ">Thiếu giờ</option>
+                </select>
             </div>
             <div class="form-group">
                 <label for="employeeSearch">Tìm nhân viên</label>

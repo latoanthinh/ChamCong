@@ -63,31 +63,6 @@ function createEmployeeSkeleton() {
             `).join('');
 }
 
-// Demo request: gọi window.simulateApiRequest() trong Console để xem trạng thái loading.
-window.simulateApiRequest = function () {
-    const list = document.getElementById('attendanceList');
-    list.setAttribute('aria-busy', 'true');
-    list.innerHTML = createAttendanceSkeleton();
-    showPageLoader('Đang mô phỏng gọi API...');
-
-    return new Promise(resolve => {
-        setTimeout(() => {
-            list.removeAttribute('aria-busy');
-            list.innerHTML = `
-                        <div class="item">
-                            <div>
-                                <div class="item-date">📅 ${todayStr}</div>
-                                <div class="item-time"><span>Vào: <strong class="time-badge">08:00</strong></span><span>Ra: <strong class="time-badge">18:30</strong></span></div>
-                            </div>
-                            <span class="item-status status-lam">ĐI LÀM</span>
-                        </div>
-                    `;
-            hidePageLoader();
-            resolve({ ok: true, data: [{ date: todayStr, status: 'Đi làm', checkIn: '08:00', checkOut: '18:30' }] });
-        }, 2000);
-    });
-};
-
 function showAuthError(error) {
     const messages = {
         'auth/invalid-credential': 'Tên đăng nhập hoặc mật khẩu không đúng.',
@@ -459,11 +434,8 @@ function getEffectiveStatus(item) {
 
     const currentMinutes = getCurrentVietnamMinutes();
     const isPastDate = item.date < todayStr;
-    const isPastDeadline = item.date === todayStr && (
-        (missingCheckIn && currentMinutes > 12 * 60) ||
-        (missingCheckOut && currentMinutes > 18 * 60 + 30)
-    );
-    return isPastDate || isPastDeadline ? 'Quên chấm công' : storedStatus || 'Không xác định';
+    const missedCheckInDeadline = item.date === todayStr && missingCheckIn && currentMinutes > 12 * 60;
+    return isPastDate || missedCheckInDeadline ? 'Quên chấm công' : storedStatus || 'Không xác định';
 }
 
 async function syncExpiredAttendanceStatus() {
@@ -473,11 +445,8 @@ async function syncExpiredAttendanceStatus() {
     const todayData = todaySnapshot.exists() ? todaySnapshot.data() : null;
     const hasLeaveStatus = todayData && typeof todayData.status === 'string' && todayData.status.includes('Nghỉ');
     const missingCheckIn = !todayData || !todayData.checkIn || todayData.checkIn === 'Chưa chấm';
-    const missingCheckOut = todayData && (!todayData.checkOut || todayData.checkOut === 'Chưa chấm');
     const missedCheckInDeadline = missingCheckIn && currentMinutes > 12 * 60;
-    const missedCheckOutDeadline = missingCheckOut && currentMinutes > 18 * 60 + 30;
-
-    if (!hasLeaveStatus && (missedCheckInDeadline || missedCheckOutDeadline)) {
+    if (!hasLeaveStatus && missedCheckInDeadline) {
         await setDoc(todayRef, {
             date: todayStr,
             status: 'Quên chấm công',
@@ -606,7 +575,8 @@ window.updateButtonState = function () {
             btn.disabled = true;
             btnText.textContent = 'Hôm nay đã ghi nhận nghỉ (1/1)';
             return;
-        } else if (existingStatus === 'Quên chấm công') {
+        } else if (existingStatus === 'Quên chấm công' &&
+            (!todayExistingRecord.checkIn || todayExistingRecord.checkIn === 'Chưa chấm')) {
             btn.disabled = true;
             btnText.textContent = 'Hôm nay đã ghi nhận quên chấm công';
             return;
@@ -661,9 +631,22 @@ window.saveProfile = async function () {
 function renderEmployees() {
     const list = document.getElementById('employeeList');
     const keyword = document.getElementById('employeeSearch').value.trim().toLowerCase();
+    const month = document.getElementById('adminMonth').value;
+    const statusFilter = document.getElementById('adminStatusFilter').value;
     const visibleEmployees = employees.filter(employee => {
         const text = `${employee.displayName || ''} ${employee.email || ''}`.toLowerCase();
-        return text.includes(keyword);
+        if (!text.includes(keyword)) return false;
+        if (!statusFilter) return true;
+        return (employeeAttendance.get(employee.uid) || [])
+            .filter(record => !month || String(record.date || '').startsWith(month))
+            .some(record => {
+                const status = getEffectiveStatus(record);
+                return statusFilter === 'Nghỉ'
+                    ? status.includes('Nghỉ')
+                    : statusFilter === 'Thiếu giờ'
+                        ? !status.includes('Nghỉ') && hasMissingTime(record)
+                        : status === statusFilter || status.startsWith(statusFilter);
+            });
     });
 
     if (!visibleEmployees.length) {
@@ -676,7 +659,7 @@ function renderEmployees() {
                     <div class="employee-info">
                         <strong>${escapeHtml(employee.displayName || 'Chưa đặt tên')}</strong>
                         <span>${escapeHtml(employee.email || employee.uid)}</span>
-                        <span>${employee.active === false ? 'Trạng thái: Đã khóa' : 'Trạng thái: Đang hoạt động'}</span>
+                        <span>${employee.active === false ? 'Trạng thái: Đã khóa' : 'Trạng thái: Đang hoạt động'} · ${escapeHtml(employee.role || 'Nhân viên')}</span>
                     </div>
                     <div class="employee-actions">
                         <button type="button" class="btn-secondary" data-view-attendance="${escapeHtml(employee.uid)}">Xem công</button>
@@ -726,9 +709,16 @@ async function loadEmployees() {
 function updateAdminSummary() {
     const todayRecords = employees.map(employee => (employeeAttendance.get(employee.uid) || [])
         .find(record => record.date === todayStr));
+    const month = document.getElementById('adminMonth').value;
+    const monthRecords = employees.flatMap(employee => employeeAttendance.get(employee.uid) || [])
+        .filter(record => !month || String(record.date || '').startsWith(month));
+    const effectiveStatuses = monthRecords.map(getEffectiveStatus);
     document.getElementById('totalEmployees').textContent = employees.length;
     document.getElementById('activeEmployees').textContent = employees.filter(employee => employee.active !== false).length;
     document.getElementById('checkedEmployees').textContent = todayRecords.filter(Boolean).length;
+    document.getElementById('lateEmployees').textContent = effectiveStatuses.filter(status => status === 'Đi trễ').length;
+    document.getElementById('missingEmployees').textContent = monthRecords.filter(record => hasMissingTime(record) && !getEffectiveStatus(record).includes('Nghỉ')).length;
+    document.getElementById('leaveEmployees').textContent = effectiveStatuses.filter(status => status.includes('Nghỉ')).length;
 }
 
 async function viewEmployeeAttendance(uid) {
@@ -740,18 +730,77 @@ async function viewEmployeeAttendance(uid) {
         .sort((first, second) => String(second.date).localeCompare(String(first.date)));
     const rows = records.length ? records.map(record => `
                 <tr>
-                    <td>${escapeHtml(record.date)}</td>
-                    <td>${escapeHtml(record.status || '')}</td>
-                    <td>${escapeHtml(record.checkIn || 'Chưa chấm')}</td>
-                    <td>${escapeHtml(record.checkOut || 'Chưa chấm')}</td>
+                    <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;">${escapeHtml(record.date)}</td>
+                    <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(record.status || '')}</td>
+                    <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;">${escapeHtml(record.checkIn || 'Chưa chấm')}</td>
+                    <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;">${escapeHtml(record.checkOut || 'Chưa chấm')}</td>
+                    <td style="padding:7px 4px;border-bottom:1px solid #e2e8f0;text-align:right;"><button type="button" class="btn-secondary admin-edit-attendance" data-date="${escapeHtml(record.date)}" style="width:auto;padding:7px 10px;font-size:12px;margin:0;">Sửa</button></td>
                 </tr>
-            `).join('') : '<tr><td colspan="4">Không có dữ liệu trong tháng này.</td></tr>';
+            `).join('') : '<tr><td colspan="5">Không có dữ liệu trong tháng này.</td></tr>';
     await Swal.fire({
         title: escapeHtml(employee.displayName || employee.email || 'Nhân viên'),
-        html: `<div style="max-height:360px;overflow:auto;"><table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px;"><thead><tr><th>Ngày</th><th>Trạng thái</th><th>Vào</th><th>Ra</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+        html: `<div style="max-height:360px;overflow:auto;padding:0 4px;"><table style="width:100%;border-collapse:separate;border-spacing:0 3px;text-align:left;font-size:13px;"><thead><tr><th style="padding:4px 8px 7px;">Ngày</th><th style="padding:4px 8px 7px;">Trạng thái</th><th style="padding:4px 8px 7px;">Vào</th><th style="padding:4px 8px 7px;">Ra</th><th style="padding:4px 4px 7px;"></th></tr></thead><tbody>${rows}</tbody></table></div>`,
         confirmButtonText: 'Đóng',
-        width: 640
+        width: 720,
+        didOpen: () => {
+            document.querySelectorAll('.admin-edit-attendance').forEach(button => {
+                button.addEventListener('click', () => editEmployeeAttendance(uid, button.dataset.date));
+            });
+        }
     });
+}
+
+async function editEmployeeAttendance(uid, date) {
+    const record = (employeeAttendance.get(uid) || []).find(item => item.date === date);
+    if (!record) return;
+    const currentStatus = String(record.status || 'Đi làm');
+    const isLeaveRecord = currentStatus.includes('Nghỉ');
+    const result = await Swal.fire({
+        title: `Sửa công ngày ${date}`,
+        html: `
+            <div id="adminTimeFields" style="display:${isLeaveRecord ? 'none' : 'block'}">
+                <input id="adminCheckIn" class="swal2-input" style="width:100%;max-width:100%;margin:8px 0;" value="${escapeHtml(record.checkIn || 'Chưa chấm')}" placeholder="Giờ vào, ví dụ 08:00">
+                <input id="adminCheckOut" class="swal2-input" style="width:100%;max-width:100%;margin:8px 0;" value="${escapeHtml(record.checkOut || 'Chưa chấm')}" placeholder="Giờ ra, ví dụ 17:30">
+            </div>
+            <select id="adminRecordStatus" class="swal2-select" style="display:block;width:100%;max-width:100%;margin:8px 0;box-sizing:border-box;">
+                ${['Đi làm', 'Đi trễ', 'Về sớm', 'Nghỉ phép', 'Nghỉ không lương', 'Nghỉ Lễ', 'Quên chấm công'].map(status => `<option value="${status}" ${String(record.status || '') === status ? 'selected' : ''}>${status}</option>`).join('')}
+            </select>`,
+        showCancelButton: true,
+        confirmButtonText: 'Lưu thay đổi',
+        cancelButtonText: 'Hủy',
+        width: 520,
+        customClass: { popup: 'attendance-edit-popup' },
+        didOpen: () => {
+            document.getElementById('adminRecordStatus').addEventListener('change', event => {
+                document.getElementById('adminTimeFields').style.display = event.target.value.includes('Nghỉ') ? 'none' : 'block';
+            });
+        },
+        preConfirm: () => {
+            const status = document.getElementById('adminRecordStatus').value;
+            const isLeave = status.includes('Nghỉ');
+            return {
+                checkIn: isLeave ? 'Nghỉ' : (document.getElementById('adminCheckIn').value.trim() || 'Chưa chấm'),
+                checkOut: isLeave ? 'Nghỉ' : (document.getElementById('adminCheckOut').value.trim() || 'Chưa chấm'),
+                status
+            };
+        }
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+        const attendanceRef = doc(db, 'users', uid, 'attendance', date);
+        await setDoc(attendanceRef, { ...result.value, updatedAt: serverTimestamp(), updatedBy: currentUser.uid }, { merge: true });
+        await setDoc(doc(db, 'auditLogs', `${Date.now()}-${uid}`), {
+            action: 'UPDATE_ATTENDANCE', employeeUid: uid, date,
+            before: { checkIn: record.checkIn || 'Chưa chấm', checkOut: record.checkOut || 'Chưa chấm', status: record.status || '' },
+            after: result.value, updatedBy: currentUser.uid, updatedAt: serverTimestamp()
+        });
+        await loadEmployees();
+        Swal.fire({ icon: 'success', title: 'Đã cập nhật công', timer: 1300, showConfirmButton: false });
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Lỗi', 'Không thể cập nhật công. Hãy kiểm tra Firestore Rules.', 'error');
+    }
 }
 
 async function editEmployee(uid) {
@@ -759,18 +808,31 @@ async function editEmployee(uid) {
     if (!employee) return;
     const result = await Swal.fire({
         title: 'Sửa nhân viên',
-        input: 'text',
-        inputValue: employee.displayName || '',
-        inputLabel: 'Tên hiển thị',
-        inputPlaceholder: 'Nhập tên nhân viên',
+        html: `
+            <input id="employeeDisplayName" class="swal2-input" value="${escapeHtml(employee.displayName || '')}" placeholder="Tên hiển thị">
+            <select id="employeeRole" class="swal2-select">
+                ${['Nhân viên', 'Quản trị viên', 'Super Admin'].map(role => `<option value="${role}" ${String(employee.role || 'Nhân viên') === role ? 'selected' : ''}>${role}</option>`).join('')}
+            </select>`,
         showCancelButton: true,
         confirmButtonText: 'Lưu',
         cancelButtonText: 'Hủy',
-        inputValidator: value => value.trim() ? undefined : 'Vui lòng nhập tên nhân viên.'
+        preConfirm: () => {
+            const displayName = document.getElementById('employeeDisplayName').value.trim();
+            if (!displayName) {
+                Swal.showValidationMessage('Vui lòng nhập tên nhân viên.');
+                return undefined;
+            }
+            return { displayName, role: document.getElementById('employeeRole').value };
+        }
     });
     if (!result.isConfirmed) return;
     try {
-        await setDoc(doc(db, 'users', uid), { displayName: result.value.trim() }, { merge: true });
+        await setDoc(doc(db, 'users', uid), { ...result.value, updatedAt: serverTimestamp(), updatedBy: currentUser.uid }, { merge: true });
+        await setDoc(doc(db, 'auditLogs', `${Date.now()}-${uid}`), {
+            action: 'UPDATE_EMPLOYEE_PROFILE', employeeUid: uid,
+            before: { displayName: employee.displayName || '', role: employee.role || 'Nhân viên' },
+            after: result.value, updatedBy: currentUser.uid, updatedAt: serverTimestamp()
+        });
         await loadEmployees();
         Swal.fire({ icon: 'success', title: 'Đã cập nhật', timer: 1200, showConfirmButton: false });
     } catch (error) {
@@ -804,6 +866,11 @@ async function toggleEmployee(uid) {
 document.getElementById('employeeSearch').addEventListener('input', renderEmployees);
 document.getElementById('refreshEmployeesBtn').addEventListener('click', loadEmployees);
 document.getElementById('adminMonth').value = todayStr.slice(0, 7);
+document.getElementById('adminMonth').addEventListener('change', () => {
+    updateAdminSummary();
+    renderEmployees();
+});
+document.getElementById('adminStatusFilter').addEventListener('change', renderEmployees);
 
 window.saveAttendance = async function () {
     const date = dateInput.value;
@@ -852,7 +919,8 @@ window.saveAttendance = async function () {
             Swal.fire('Thông báo', 'Bạn đã chấm nghỉ hôm nay. Vui lòng xóa record rồi chấm lại.', 'warning');
             return;
         }
-        if (existingStatus === 'Quên chấm công') {
+        if (existingStatus === 'Quên chấm công' &&
+            (!todayExistingRecord.checkIn || todayExistingRecord.checkIn === 'Chưa chấm')) {
             Swal.fire('Thông báo', 'Hôm nay đã được ghi nhận là quên chấm công.', 'warning');
             return;
         }
@@ -920,7 +988,7 @@ window.saveAttendance = async function () {
                     const diffMinutes = standardOutMinutes - roundedCheckOut.minutes;
                     finalStatus = `Về sớm ${getEarlyLeaveText(diffMinutes)}`;
                 } else {
-                    finalStatus = typeof todayExistingRecord.status === 'string' ? todayExistingRecord.status : 'Đi làm';
+                    finalStatus = todayExistingRecord.status === 'Đi trễ' ? 'Đi trễ' : 'Đi làm';
                 }
             } else {
                 Swal.fire({
