@@ -57,9 +57,16 @@
     </section>
 
     <main id="appScreen" class="container hidden">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:16px;">
+        <div class="app-topbar">
             <strong id="userDisplayName"></strong>
-            <div style="display: flex; gap: 6px;">
+            <div class="app-topbar-actions">
+                <div class="live-clock" aria-label="Thời gian hiện tại tại Việt Nam">
+                    <span class="live-clock-dot" aria-hidden="true"></span>
+                    <div>
+                        <strong id="liveClockTime">00:00:00</strong>
+                        <span id="liveClockDate">Đang cập nhật...</span>
+                    </div>
+                </div>
                 <button id="darkModeBtn" type="button" class="btn-secondary" style="width:auto; padding:8px 10px; font-size: 1.1rem;" title="Chế độ tối">🌙</button>
                 <button id="logoutBtn" type="button" class="btn-danger" style="width:auto; padding:8px 12px;">Đăng
                     xuất</button>

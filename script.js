@@ -134,6 +134,31 @@ function initializeDarkMode() {
 
 initializeDarkMode();
 
+function updateLiveClock() {
+    const timeElement = document.getElementById('liveClockTime');
+    const dateElement = document.getElementById('liveClockDate');
+    if (!timeElement || !dateElement) return;
+
+    const now = new Date();
+    timeElement.textContent = new Intl.DateTimeFormat('vi-VN', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    }).format(now);
+    dateElement.textContent = new Intl.DateTimeFormat('vi-VN', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        weekday: 'long',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    }).format(now);
+}
+
+updateLiveClock();
+window.liveClockTimer = setInterval(updateLiveClock, 1000);
+
 function getUserAttendanceCollection() {
     if (!currentUser) throw new Error('Chưa đăng nhập');
     return collection(db, 'users', currentUser.uid, 'attendance');
