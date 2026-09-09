@@ -377,20 +377,24 @@ function renderCalendar() {
     const firstDay = new Date(year, month, 1);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const mondayFirstOffset = (firstDay.getDay() + 6) % 7;
-    const attendanceDates = new Set(globalAttendanceData.map(item => item?.date));
+    const attendanceByDate = new Map(globalAttendanceData.map(item => [item?.date, item]));
     label.textContent = new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric' }).format(firstDay);
 
     let cells = Array.from({ length: mondayFirstOffset }, () => '<span class="calendar-cell is-empty" aria-hidden="true"></span>');
     for (let day = 1; day <= daysInMonth; day++) {
         const date = getCalendarDateKey(year, month, day);
         const holiday = getHolidayInfo(date);
+        const attendance = attendanceByDate.get(date);
         const dayOfWeek = new Date(year, month, day).getDay();
         const classes = ['calendar-cell'];
         if (dayOfWeek === 0 || dayOfWeek === 6) classes.push('is-weekend');
-        if (attendanceDates.has(date)) classes.push('is-work');
+        if (attendance) {
+            classes.push(getEffectiveStatus(attendance).includes('Nghỉ') ? 'is-leave' : 'is-work');
+        }
         if (holiday) classes.push('is-holiday');
         if (date === todayStr) classes.push('is-today');
-        const labelText = holiday ? `${date}: ${holiday.name}` : `${date}: ${attendanceDates.has(date) ? 'Đã chấm công' : 'Chưa có dữ liệu'}`;
+        const statusText = attendance ? getEffectiveStatus(attendance) : 'Chưa có dữ liệu';
+        const labelText = holiday ? `${date}: ${holiday.name} - ${statusText}` : `${date}: ${statusText}`;
         const cellContent = `<span class="solar-day">${day}</span><small class="lunar-day">${lunarDateLabel(date)}</small>`;
         if (holiday) {
             cells.push(`<button class="${classes.join(' ')} is-clickable" type="button" role="gridcell" data-holiday-date="${date}" title="Bấm để xem chi tiết: ${escapeHtml(labelText)}">${cellContent}</button>`);
@@ -642,7 +646,7 @@ window.saveProfile = async function () {
     button.textContent = 'Đang lưu...';
     try {
         await setDoc(doc(db, 'users', currentUser.uid), { displayName }, { merge: true });
-        document.getElementById('userDisplayName').textContent = `👤 ${displayName}`;
+        document.getElementById('userDisplayName').textContent = `Xin chào, ${displayName}`;
         Swal.fire({ icon: 'success', title: 'Đã lưu tên hiển thị', timer: 1400, showConfirmButton: false });
     } catch (error) {
         console.error(error);
@@ -764,9 +768,10 @@ async function viewEmployeeAttendance(uid) {
             `).join('') : '<tr><td colspan="5">Không có dữ liệu trong tháng này.</td></tr>';
     await Swal.fire({
         title: escapeHtml(employee.displayName || employee.email || 'Nhân viên'),
-        html: `<div style="max-height:360px;overflow:auto;padding:0 4px;"><table style="width:100%;border-collapse:separate;border-spacing:0 3px;text-align:left;font-size:13px;"><thead><tr><th style="padding:4px 8px 7px;">Ngày</th><th style="padding:4px 8px 7px;">Trạng thái</th><th style="padding:4px 8px 7px;">Vào</th><th style="padding:4px 8px 7px;">Ra</th><th style="padding:4px 4px 7px;"></th></tr></thead><tbody>${rows}</tbody></table></div>`,
+        html: `<div style="max-height:360px;overflow:auto;padding:0 4px;"><table class="attendance-view-table" style="width:100%;border-collapse:separate;border-spacing:0 3px;text-align:left;font-size:13px;"><thead><tr><th style="padding:4px 8px 7px;">Ngày</th><th style="padding:4px 8px 7px;">Trạng thái</th><th style="padding:4px 8px 7px;">Vào</th><th style="padding:4px 8px 7px;">Ra</th><th style="padding:4px 4px 7px;"></th></tr></thead><tbody>${rows}</tbody></table></div>`,
         confirmButtonText: 'Đóng',
         width: 720,
+        customClass: { popup: 'attendance-view-popup' },
         didOpen: () => {
             document.querySelectorAll('.admin-edit-attendance').forEach(button => {
                 button.addEventListener('click', () => editEmployeeAttendance(uid, button.dataset.date));
@@ -1507,7 +1512,7 @@ onAuthStateChanged(auth, async (user) => {
         const profile = profileSnapshot.exists() ? profileSnapshot.data() : {};
         document.getElementById('displayNameInput').value = profile.displayName || user.displayName || '';
         document.getElementById('userDisplayName').textContent =
-            `👤 ${profile.displayName || user.displayName || user.email}`;
+            `Xin chào, ${profile.displayName || user.displayName || user.email}`;
         if (isAdmin) {
             await loadEmployees();
         } else {
