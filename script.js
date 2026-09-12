@@ -81,7 +81,7 @@ function setLoginMode(asAdmin) {
     loginAsAdmin = asAdmin;
     document.getElementById('employeeLoginMode').classList.toggle('active', !asAdmin);
     document.getElementById('adminLoginMode').classList.toggle('active', asAdmin);
-    document.querySelector('#authScreen p').textContent = asAdmin
+    document.getElementById('authDescription').textContent = asAdmin
         ? 'Đăng nhập bằng tài khoản quản trị để quản lý nhân viên.'
         : 'Sử dụng tài khoản được cấp để xem dữ liệu cá nhân.';
 }
@@ -182,6 +182,15 @@ const dateInput = document.getElementById('date');
 dateInput.value = todayStr;
 dateInput.max = todayStr;
 dateInput.min = todayStr;
+const todayStamp = document.getElementById('todayStamp');
+if (todayStamp) {
+    todayStamp.textContent = new Intl.DateTimeFormat('vi-VN', {
+        day: '2-digit', month: '2-digit'
+    }).format(new Date(`${todayStr}T00:00:00`));
+    todayStamp.nextElementSibling.textContent = new Intl.DateTimeFormat('vi-VN', {
+        month: 'long', year: 'numeric'
+    }).format(new Date(`${todayStr}T00:00:00`));
+}
 document.getElementById('reportMonth').value = todayStr.slice(0, 7);
 
 let globalAttendanceData = [];
@@ -1178,12 +1187,12 @@ async function loadAttendance() {
             }
             const resetBtn = document.getElementById('resetTodayBtn');
             if (resetBtn) {
-                resetBtn.style.display = 'none';
+                resetBtn.classList.remove('hidden');
             }
         } else {
             const resetBtn = document.getElementById('resetTodayBtn');
             if (resetBtn) {
-                resetBtn.style.display = 'none';
+                resetBtn.classList.add('hidden');
             }
         }
 
@@ -1345,7 +1354,7 @@ window.resetTodayRecord = async function () {
                 // Ẩn nút xóa và update
                 const resetBtn = document.getElementById('resetTodayBtn');
                 if (resetBtn) {
-                    resetBtn.style.display = 'none';
+                    resetBtn.classList.add('hidden');
                 }
                 
                 // Enable lại nút save
@@ -1488,6 +1497,14 @@ window.confirmClearData = function () {
         }
     });
 };
+
+document.getElementById('saveBtn').addEventListener('click', window.saveAttendance);
+document.getElementById('saveProfileBtn').addEventListener('click', window.saveProfile);
+document.getElementById('resetTodayBtn').addEventListener('click', window.resetTodayRecord);
+document.querySelector('[data-action="report"]').addEventListener('click', window.openReportModal);
+document.querySelector('[data-action="reminders"]').addEventListener('click', window.enableReminders);
+document.querySelector('[data-action="clear-data"]').addEventListener('click', window.confirmClearData);
+document.getElementById('status').addEventListener('change', window.updateButtonState);
 
 onAuthStateChanged(auth, async (user) => {
     showPageLoader(user ? 'Đang tải dữ liệu tài khoản...' : 'Đang kiểm tra phiên đăng nhập...');
