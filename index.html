@@ -3,34 +3,393 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#102a43">
+    <meta name="theme-color" content="#0f2744">
+    <meta name="description" content="Workday - Sổ chấm công nội bộ cho nhân viên và quản trị viên">
     <title>Workday | Sổ chấm công</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="pageLoader" class="page-loader" role="status" aria-live="polite" aria-label="Đang tải"><div class="loader-mark" aria-hidden="true"><span></span><span></span><span></span></div><strong id="pageLoaderText">Đang chuẩn bị dữ liệu...</strong><span>Vui lòng chờ trong giây lát</span></div>
+    <div id="pageLoader" class="page-loader" role="status" aria-live="polite" aria-label="Đang tải">
+        <div class="loader-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <strong id="pageLoaderText">Đang chuẩn bị dữ liệu...</strong>
+        <span>Vui lòng chờ trong giây lát</span>
+    </div>
 
     <section id="authScreen" class="auth-shell">
-        <div class="auth-aside"><div class="brand brand-light"><span class="brand-mark">W</span><span>Workday</span></div><div class="auth-intro"><span class="eyebrow">SỔ CHẤM CÔNG NỘI BỘ</span><h1>Một ngày làm việc rõ ràng bắt đầu từ một lần chấm công đúng lúc.</h1><p>Theo dõi giờ vào, giờ ra và ngày nghỉ trong một không gian gọn gàng cho cả nhân viên lẫn quản trị viên.</p></div><div class="auth-aside-footer"><span class="status-dot"></span>Dữ liệu được đồng bộ an toàn qua Firebase</div></div>
-        <div class="auth-card"><div class="brand brand-dark"><span class="brand-mark">W</span><span>Workday</span></div><div class="auth-heading"><span class="eyebrow">CHÀO MỪNG TRỞ LẠI</span><h2>Đăng nhập tài khoản</h2><p id="authDescription">Sử dụng tài khoản được cấp để xem dữ liệu cá nhân.</p></div><div class="login-mode" role="tablist" aria-label="Loại tài khoản"><button id="employeeLoginMode" type="button" class="active" role="tab">Nhân viên</button><button id="adminLoginMode" type="button" role="tab">Quản trị viên</button></div><form id="loginForm"><div class="form-group"><label for="loginEmail">Tên đăng nhập / Email</label><input id="loginEmail" type="text" autocomplete="username" placeholder="ten@email.com" required></div><div class="form-group"><label for="loginPassword">Mật khẩu</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu" required></div><div id="authError" class="auth-error" role="alert"></div><button id="loginBtn" type="submit" class="btn-primary">Đăng nhập <span aria-hidden="true">→</span></button></form><p class="auth-note">Bạn gặp vấn đề khi đăng nhập? Liên hệ quản trị viên.</p></div>
+        <div class="auth-aside">
+            <div class="brand brand-light">
+                <span class="brand-mark">W</span>
+                <span>Workday</span>
+            </div>
+            <div class="auth-intro">
+                <span class="eyebrow">SỔ CHẤM CÔNG NỘI BỘ</span>
+                <h1>Một ngày làm việc rõ ràng bắt đầu từ một lần chấm công đúng lúc.</h1>
+                <p>Theo dõi giờ vào, giờ ra và ngày nghỉ trong một không gian gọn gàng cho cả nhân viên lẫn quản trị viên.</p>
+                <ul class="auth-highlights">
+                    <li>Chấm công 2 lần: vào sáng / ra chiều</li>
+                    <li>Lịch âm dương & ngày lễ Việt Nam</li>
+                    <li>Báo cáo tháng, in ấn nhanh</li>
+                </ul>
+            </div>
+            <div class="auth-aside-footer">
+                <span class="status-dot"></span>
+                Dữ liệu được đồng bộ an toàn qua Firebase
+            </div>
+        </div>
+        <div class="auth-card">
+            <div class="brand brand-dark">
+                <span class="brand-mark">W</span>
+                <span>Workday</span>
+            </div>
+            <div class="auth-heading">
+                <span class="eyebrow">CHÀO MỪNG TRỞ LẠI</span>
+                <h2>Đăng nhập tài khoản</h2>
+                <p id="authDescription">Sử dụng tài khoản được cấp để xem dữ liệu cá nhân.</p>
+            </div>
+            <div class="login-mode" role="tablist" aria-label="Loại tài khoản">
+                <button id="employeeLoginMode" type="button" class="active" role="tab" aria-selected="true">Nhân viên</button>
+                <button id="adminLoginMode" type="button" role="tab" aria-selected="false">Quản trị viên</button>
+            </div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="loginEmail">Tên đăng nhập / Email</label>
+                    <input id="loginEmail" type="text" autocomplete="username" placeholder="ten@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Mật khẩu</label>
+                    <div class="password-field">
+                        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu" required>
+                        <button id="togglePasswordBtn" type="button" class="password-toggle" aria-label="Hiện mật khẩu" title="Hiện/ẩn mật khẩu">👁</button>
+                    </div>
+                </div>
+                <div id="authError" class="auth-error" role="alert"></div>
+                <button id="loginBtn" type="submit" class="btn-primary">
+                    <span id="loginBtnText">Đăng nhập</span>
+                    <span aria-hidden="true">→</span>
+                </button>
+            </form>
+            <p class="auth-note">Bạn gặp vấn đề khi đăng nhập? Liên hệ quản trị viên.</p>
+        </div>
     </section>
 
     <main id="appScreen" class="app-shell hidden">
-        <header class="app-header"><div class="brand brand-dark"><span class="brand-mark">W</span><span>Workday</span></div><div class="header-actions"><div class="live-clock" aria-label="Thời gian hiện tại tại Việt Nam"><span class="live-clock-dot"></span><div><strong id="liveClockTime">00:00:00</strong><span id="liveClockDate">Đang cập nhật...</span></div></div><button id="darkModeBtn" type="button" class="icon-btn" title="Đổi giao diện" aria-label="Đổi giao diện">◐</button><button id="logoutBtn" type="button" class="btn-ghost">Đăng xuất</button></div></header>
-        <div class="page-heading"><div><span class="eyebrow">KHÔNG GIAN LÀM VIỆC</span><h1 id="appTitle">Sổ chấm công cá nhân</h1></div><div class="user-chip"><span class="avatar">U</span><strong id="userDisplayName">Xin chào</strong></div></div>
+        <header class="app-header">
+            <div class="brand brand-dark">
+                <span class="brand-mark">W</span>
+                <span>Workday</span>
+            </div>
+            <div class="header-actions">
+                <div class="live-clock" aria-label="Thời gian hiện tại tại Việt Nam">
+                    <span class="live-clock-dot"></span>
+                    <div>
+                        <strong id="liveClockTime">00:00:00</strong>
+                        <span id="liveClockDate">Đang cập nhật...</span>
+                    </div>
+                </div>
+                <button id="darkModeBtn" type="button" class="icon-btn" title="Đổi giao diện" aria-label="Đổi giao diện">◐</button>
+                <button id="logoutBtn" type="button" class="btn-ghost">Đăng xuất</button>
+            </div>
+        </header>
 
-        <section id="adminPanel" class="admin-panel hidden"><div class="section-heading"><div><span class="eyebrow">QUẢN TRỊ</span><h2>Đội ngũ nhân viên</h2></div><button id="refreshEmployeesBtn" type="button" class="btn-secondary">↻ Làm mới</button></div><div class="admin-summary"><div class="admin-stat"><strong id="totalEmployees">0</strong><span>Tổng nhân viên</span></div><div class="admin-stat"><strong id="activeEmployees">0</strong><span>Đang hoạt động</span></div><div class="admin-stat"><strong id="checkedEmployees">0</strong><span>Đã chấm hôm nay</span></div><div class="admin-stat"><strong id="lateEmployees">0</strong><span>Đi trễ</span></div><div class="admin-stat"><strong id="missingEmployees">0</strong><span>Thiếu công</span></div><div class="admin-stat"><strong id="leaveEmployees">0</strong><span>Đang nghỉ</span></div></div><div class="admin-tools"><input id="adminMonth" type="month" aria-label="Tháng báo cáo"><select id="adminStatusFilter" aria-label="Lọc trạng thái"><option value="">Tất cả trạng thái</option><option value="Đi làm">Đi làm</option><option value="Đi trễ">Đi trễ</option><option value="Về sớm">Về sớm</option><option value="Nghỉ">Nghỉ</option><option value="Quên chấm công">Quên chấm công</option><option value="Thiếu giờ">Thiếu giờ</option></select><input id="employeeSearch" type="search" placeholder="Tìm tên hoặc email nhân viên"></div><div id="employeeList" class="employee-list" aria-busy="true"></div></section>
+        <div class="page-heading">
+            <div>
+                <span class="eyebrow">KHÔNG GIAN LÀM VIỆC</span>
+                <h1 id="appTitle">Sổ chấm công cá nhân</h1>
+            </div>
+            <div class="user-chip">
+                <span class="avatar" id="userAvatar">U</span>
+                <div class="user-chip-text">
+                    <strong id="userDisplayName">Xin chào</strong>
+                    <span id="userRoleLabel">Nhân viên</span>
+                </div>
+            </div>
+        </div>
 
-        <div id="employeeWorkspace" class="workspace-layout"><section class="attendance-book"><div class="welcome-panel"><div><span class="eyebrow">HÔM NAY</span><h2>Ghi nhận ngày công</h2><p>Chấm công vào buổi sáng và chấm công ra sau giờ nghỉ trưa.</p></div><div class="today-stamp"><strong id="todayStamp">--</strong><span>Tháng --</span></div></div><div class="card action-card"><div class="card-heading"><div><span class="eyebrow">THÔNG TIN CA LÀM</span><h3>Trạng thái hôm nay</h3></div><span class="live-badge"><i></i> Đang hoạt động</span></div><div class="form-grid"><div class="form-group"><label for="displayNameInput">Tên hiển thị</label><input id="displayNameInput" type="text" maxlength="80" autocomplete="name" placeholder="Nhập tên của bạn"></div><div class="form-group"><label for="date">Ngày chấm công</label><input type="date" id="date" readonly></div></div><button id="saveProfileBtn" type="button" class="btn-outline">Lưu tên hiển thị</button><div class="form-group status-field"><label for="status">Bạn muốn ghi nhận</label><select id="status"><option value="Đi làm">Đi làm</option><option value="Nghỉ phép">Nghỉ phép</option><option value="Nghỉ không lương">Nghỉ không lương</option><option value="Nghỉ Lễ">Nghỉ Lễ</option></select></div><div class="action-row"><button id="saveBtn" type="button" class="btn-primary"><div class="spinner" id="btnSpinner"></div><span id="btnText">Ghi nhận giờ công</span><span aria-hidden="true">→</span></button><button id="resetTodayBtn" type="button" class="btn-danger-outline hidden">Xóa bản ghi</button></div></div><div class="quick-actions"><button type="button" class="btn-secondary" data-action="report">▣ Thống kê & in</button><button type="button" class="btn-secondary" data-action="reminders">◷ Nhắc chấm công</button><button type="button" class="btn-danger-outline" data-action="clear-data">Xóa dữ liệu của tôi</button></div></section>
-            <section class="attendance-overview"><div class="calendar-card"><div class="section-heading"><div><span class="eyebrow">TỔNG QUAN</span><h2>Lịch chấm công</h2></div><button id="calendarTodayBtn" type="button" class="btn-text">Hôm nay</button></div><div class="calendar-toolbar"><button id="calendarPrevBtn" class="calendar-nav-btn" type="button" aria-label="Tháng trước">←</button><strong id="calendarMonthLabel"></strong><button id="calendarNextBtn" class="calendar-nav-btn" type="button" aria-label="Tháng sau">→</button></div><div class="calendar-weekdays" aria-hidden="true"><span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span></div><div id="calendarGrid" class="calendar-grid" role="grid" aria-label="Lịch chấm công"></div><div class="calendar-legend"><span><i class="legend-dot is-work"></i>Đi làm</span><span><i class="legend-dot is-leave"></i>Ngày nghỉ</span><span><i class="legend-dot is-holiday"></i>Ngày lễ</span></div></div><div class="card report-filter"><div class="section-heading"><h3>Lịch sử gần đây</h3><button id="printOldMonthBtn" type="button" class="btn-text">In báo cáo</button></div><div class="filter-row"><input id="reportMonth" type="month" aria-label="Tháng"><select id="reportStatus" aria-label="Trạng thái"><option value="">Tất cả trạng thái</option><option value="Đi làm">Đi làm</option><option value="Đi trễ">Đi trễ</option><option value="Về sớm">Về sớm</option><option value="Quên chấm công">Quên chấm công</option><option value="Nghỉ">Ngày nghỉ</option><option value="Thiếu giờ">Thiếu giờ</option><option value="Nghỉ Lễ">Nghỉ Lễ</option></select></div><div class="list" id="attendanceList" aria-busy="true"></div></div></section>
+        <section id="adminPanel" class="admin-panel hidden">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">QUẢN TRỊ</span>
+                    <h2>Đội ngũ nhân viên</h2>
+                </div>
+                <button id="refreshEmployeesBtn" type="button" class="btn-secondary">↻ Làm mới</button>
+            </div>
+            <div class="admin-summary">
+                <div class="admin-stat">
+                    <strong id="totalEmployees">0</strong>
+                    <span>Tổng nhân viên</span>
+                </div>
+                <div class="admin-stat is-active">
+                    <strong id="activeEmployees">0</strong>
+                    <span>Đang hoạt động</span>
+                </div>
+                <div class="admin-stat is-checked">
+                    <strong id="checkedEmployees">0</strong>
+                    <span>Đã chấm hôm nay</span>
+                </div>
+                <div class="admin-stat is-late">
+                    <strong id="lateEmployees">0</strong>
+                    <span>Đi trễ</span>
+                </div>
+                <div class="admin-stat is-missing">
+                    <strong id="missingEmployees">0</strong>
+                    <span>Thiếu công</span>
+                </div>
+                <div class="admin-stat is-leave">
+                    <strong id="leaveEmployees">0</strong>
+                    <span>Đang nghỉ</span>
+                </div>
+            </div>
+            <div class="admin-dashboard">
+                <div class="admin-dashboard-heading">
+                    <div>
+                        <span class="eyebrow">PHÂN TÍCH NHANH</span>
+                        <h3>Toàn cảnh chấm công</h3>
+                    </div>
+                    <span id="adminDashboardPeriod" class="dashboard-period">Tháng hiện tại</span>
+                </div>
+                <div class="admin-insight-grid">
+                    <article class="insight-card insight-card-wide">
+                        <div class="insight-card-heading">
+                            <div>
+                                <span class="insight-kicker">NHỊP ĐỘ ĐI LÀM</span>
+                                <h4>Số lượt chấm theo ngày</h4>
+                            </div>
+                            <span id="attendanceRateLabel" class="insight-value">0%</span>
+                        </div>
+                        <div id="attendanceChart" class="attendance-chart" aria-label="Biểu đồ lượt chấm công theo ngày"></div>
+                        <div class="chart-axis"><span>Đầu tháng</span><span>Giữa tháng</span><span>Cuối tháng</span></div>
+                    </article>
+                    <article class="insight-card status-insight-card">
+                        <div class="insight-card-heading">
+                            <div>
+                                <span class="insight-kicker">PHÂN BỔ TRẠNG THÁI</span>
+                                <h4>Tình hình tháng</h4>
+                            </div>
+                        </div>
+                        <div class="status-chart-wrap">
+                            <div id="statusDonut" class="status-donut"><span id="statusDonutTotal">0</span><small>bản ghi</small></div>
+                            <div id="statusLegend" class="status-legend"></div>
+                        </div>
+                    </article>
+                </div>
+                <div class="admin-insight-grid admin-insight-grid-bottom">
+                    <article class="insight-card">
+                        <div class="insight-card-heading">
+                            <div>
+                                <span class="insight-kicker">CẦN QUAN TÂM</span>
+                                <h4>Trạng thái hôm nay</h4>
+                            </div>
+                            <span id="todayCoverageLabel" class="subtle-label">0/0 đã chấm</span>
+                        </div>
+                        <div id="todayAttentionList" class="attention-list"></div>
+                    </article>
+                    <article class="insight-card">
+                        <div class="insight-card-heading">
+                            <div>
+                                <span class="insight-kicker">HIỆU SUẤT ĐỘI NGŨ</span>
+                                <h4>Nhân viên nổi bật</h4>
+                            </div>
+                            <span class="subtle-label">Theo ngày công</span>
+                        </div>
+                        <div id="employeeLeaderboard" class="leaderboard"></div>
+                    </article>
+                </div>
+            </div>
+            <div class="admin-tools">
+                <input id="adminMonth" type="month" aria-label="Tháng báo cáo">
+                <select id="adminStatusFilter" aria-label="Lọc trạng thái">
+                    <option value="">Tất cả trạng thái</option>
+                    <option value="Đi làm">Đi làm</option>
+                    <option value="Đi trễ">Đi trễ</option>
+                    <option value="Về sớm">Về sớm</option>
+                    <option value="Nghỉ">Nghỉ</option>
+                    <option value="Quên chấm công">Quên chấm công</option>
+                    <option value="Thiếu giờ">Thiếu giờ</option>
+                </select>
+                <input id="employeeSearch" type="search" placeholder="Tìm tên hoặc email nhân viên" aria-label="Tìm nhân viên">
+            </div>
+            <div id="employeeList" class="employee-list" aria-busy="true"></div>
+        </section>
+
+        <div id="employeeWorkspace" class="workspace-layout">
+            <section class="attendance-book">
+                <div class="welcome-panel">
+                    <div>
+                        <span class="eyebrow">HÔM NAY</span>
+                        <h2>Ghi nhận ngày công</h2>
+                        <p>Chấm công vào buổi sáng và chấm công ra sau giờ nghỉ trưa.</p>
+                    </div>
+                    <div class="today-stamp">
+                        <strong id="todayStamp">--</strong>
+                        <span>Tháng --</span>
+                    </div>
+                </div>
+
+                <div id="todayStatusCard" class="today-status-card">
+                    <div class="today-status-main">
+                        <span class="eyebrow">TRẠNG THÁI HIỆN TẠI</span>
+                        <strong id="todayStatusLabel">Chưa chấm công</strong>
+                        <p id="todayStatusHint">Hãy ghi nhận giờ vào khi bắt đầu ca làm.</p>
+                    </div>
+                    <div class="today-status-times">
+                        <div class="time-chip">
+                            <span>Giờ vào</span>
+                            <strong id="todayCheckInLabel">--:--</strong>
+                        </div>
+                        <div class="time-chip">
+                            <span>Giờ ra</span>
+                            <strong id="todayCheckOutLabel">--:--</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card action-card">
+                    <div class="card-heading">
+                        <div>
+                            <span class="eyebrow">THÔNG TIN CA LÀM</span>
+                            <h3>Ghi nhận hôm nay</h3>
+                        </div>
+                        <span class="live-badge"><i></i> Đang hoạt động</span>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="displayNameInput">Tên hiển thị</label>
+                            <input id="displayNameInput" type="text" maxlength="80" autocomplete="name" placeholder="Nhập tên của bạn">
+                        </div>
+                        <div class="form-group">
+                            <label for="date">Ngày chấm công</label>
+                            <input type="date" id="date" readonly>
+                        </div>
+                    </div>
+                    <button id="saveProfileBtn" type="button" class="btn-outline">Lưu tên hiển thị</button>
+                    <div class="form-group status-field">
+                        <label for="status">Bạn muốn ghi nhận</label>
+                        <select id="status">
+                            <option value="Đi làm">Đi làm</option>
+                            <option value="Nghỉ phép">Nghỉ phép</option>
+                            <option value="Nghỉ không lương">Nghỉ không lương</option>
+                            <option value="Nghỉ Lễ">Nghỉ Lễ</option>
+                        </select>
+                    </div>
+                    <div class="action-row">
+                        <button id="saveBtn" type="button" class="btn-primary">
+                            <div class="spinner" id="btnSpinner"></div>
+                            <span id="btnText">Ghi nhận giờ công</span>
+                            <span aria-hidden="true">→</span>
+                        </button>
+                        <button id="resetTodayBtn" type="button" class="btn-danger-outline hidden">Xóa bản ghi</button>
+                    </div>
+                </div>
+
+                <div class="month-stats" id="monthStats">
+                    <div class="month-stat">
+                        <strong id="statWorkDays">0</strong>
+                        <span>Ngày công</span>
+                    </div>
+                    <div class="month-stat">
+                        <strong id="statLeaveDays">0</strong>
+                        <span>Ngày nghỉ</span>
+                    </div>
+                    <div class="month-stat">
+                        <strong id="statLateDays">0</strong>
+                        <span>Đi trễ</span>
+                    </div>
+                    <div class="month-stat">
+                        <strong id="statMissingDays">0</strong>
+                        <span>Thiếu giờ</span>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <button type="button" class="btn-secondary" data-action="report">▣ Thống kê & in</button>
+                    <button type="button" class="btn-secondary" data-action="reminders">◷ Nhắc chấm công</button>
+                    <button type="button" class="btn-danger-outline" data-action="clear-data">Xóa dữ liệu của tôi</button>
+                </div>
+            </section>
+
+            <section class="attendance-overview">
+                <div class="calendar-card">
+                    <div class="section-heading">
+                        <div>
+                            <span class="eyebrow">TỔNG QUAN</span>
+                            <h2>Lịch chấm công</h2>
+                        </div>
+                        <button id="calendarTodayBtn" type="button" class="btn-text">Hôm nay</button>
+                    </div>
+                    <div class="calendar-toolbar">
+                        <button id="calendarPrevBtn" class="calendar-nav-btn" type="button" aria-label="Tháng trước">←</button>
+                        <strong id="calendarMonthLabel"></strong>
+                        <button id="calendarNextBtn" class="calendar-nav-btn" type="button" aria-label="Tháng sau">→</button>
+                    </div>
+                    <div class="calendar-weekdays" aria-hidden="true">
+                        <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
+                    </div>
+                    <div id="calendarGrid" class="calendar-grid" role="grid" aria-label="Lịch chấm công"></div>
+                    <div class="calendar-legend">
+                        <span><i class="legend-dot is-work"></i>Đi làm</span>
+                        <span><i class="legend-dot is-leave"></i>Ngày nghỉ</span>
+                        <span><i class="legend-dot is-holiday"></i>Ngày lễ</span>
+                        <span><i class="legend-dot is-today"></i>Hôm nay</span>
+                    </div>
+                </div>
+
+                <div class="card report-filter">
+                    <div class="section-heading">
+                        <h3>Lịch sử gần đây</h3>
+                        <button id="printOldMonthBtn" type="button" class="btn-text">In báo cáo</button>
+                    </div>
+                    <div class="filter-row">
+                        <input id="reportMonth" type="month" aria-label="Tháng">
+                        <select id="reportStatus" aria-label="Trạng thái">
+                            <option value="">Tất cả trạng thái</option>
+                            <option value="Đi làm">Đi làm</option>
+                            <option value="Đi trễ">Đi trễ</option>
+                            <option value="Về sớm">Về sớm</option>
+                            <option value="Quên chấm công">Quên chấm công</option>
+                            <option value="Nghỉ">Ngày nghỉ</option>
+                            <option value="Thiếu giờ">Thiếu giờ</option>
+                            <option value="Nghỉ Lễ">Nghỉ Lễ</option>
+                        </select>
+                    </div>
+                    <div class="list" id="attendanceList" aria-busy="true"></div>
+                </div>
+            </section>
         </div>
     </main>
 
-    <div id="print-section"><h2>BÁO CÁO CHI TIẾT NGÀY CÔNG</h2><div class="print-meta"><span id="print-user-name"></span><span id="print-created-at"></span></div><p id="print-date-range"></p><div id="print-summary-box" class="print-summary"></div><div id="print-details"></div><h3>Chi tiết lịch sử chấm công</h3><table><thead><tr><th>STT</th><th>Ngày</th><th>Trạng thái</th><th>Giờ vào</th><th>Giờ ra</th></tr></thead><tbody id="print-table-body"></tbody><tfoot><tr><td colspan="5">Hết báo cáo</td></tr></tfoot></table></div>
+    <div id="print-section">
+        <h2>BÁO CÁO CHI TIẾT NGÀY CÔNG</h2>
+        <div class="print-meta">
+            <span id="print-user-name"></span>
+            <span id="print-created-at"></span>
+        </div>
+        <p id="print-date-range"></p>
+        <div id="print-summary-box" class="print-summary"></div>
+        <div id="print-details"></div>
+        <h3>Chi tiết lịch sử chấm công</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>STT</th>
+                    <th>Ngày</th>
+                    <th>Trạng thái</th>
+                    <th>Giờ vào</th>
+                    <th>Giờ ra</th>
+                </tr>
+            </thead>
+            <tbody id="print-table-body"></tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="5">Hết báo cáo</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
     <script type="module" src="script.js"></script>
 </body>
 </html>
