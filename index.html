@@ -396,6 +396,32 @@
         </table>
     </div>
 
+    <div id="payroll-print-section">
+        <header class="payroll-print-header">
+            <strong>CÔNG TY CỔ PHẦN THƯƠNG MẠI HOÀNG NGUYÊN TÂM</strong>
+            <span>12/5 Hoàng Kế Viêm, Phường Bảy Hiền, TP. Hồ Chí Minh</span>
+            <h1>PHIẾU LƯƠNG</h1>
+            <h2 id="payroll-print-month"></h2>
+        </header>
+        <table class="payroll-print-table payroll-print-profile">
+            <tr><th>Họ và tên</th><td id="payroll-print-name"></td><th>Phòng ban/Bộ phận</th><td id="payroll-print-department"></td></tr>
+            <tr><th>Tổng lương</th><td id="payroll-print-total-salary"></td><th>Phụ cấp</th><td id="payroll-print-allowance"></td></tr>
+            <tr><th>Lương BHXH</th><td id="payroll-print-insurance-salary"></td><th>Thực nhận</th><td id="payroll-print-net" class="payroll-print-highlight"></td></tr>
+        </table>
+        <table class="payroll-print-table">
+            <thead><tr><th colspan="2">I. Chấm công</th><th colspan="2">II. Các khoản phải trả NLĐ</th><th colspan="2">III. Các khoản phải thu NLĐ</th></tr></thead>
+            <tbody>
+                <tr><th>Ngày công</th><td id="payroll-print-work-days"></td><th>Lương ngày công</th><td id="payroll-print-work-pay"></td><th>Nộp BHXH</th><td id="payroll-print-insurance"></td></tr>
+                <tr><th>Giờ tăng ca</th><td id="payroll-print-overtime-hours"></td><th>Lương tăng ca</th><td id="payroll-print-overtime-pay"></td><th>Ứng lương</th><td id="payroll-print-advance"></td></tr>
+                <tr><th>Nghỉ phép</th><td id="payroll-print-leave-days"></td><th>Lương nghỉ phép</th><td id="payroll-print-leave-pay"></td><th>Quên chấm công</th><td id="payroll-print-forgotten"></td></tr>
+                <tr><th>Phụ cấp</th><td id="payroll-print-allowance"></td><th>Thưởng</th><td id="payroll-print-bonus"></td><th>Đi trễ</th><td id="payroll-print-late"></td></tr>
+                <tr><th></th><td></td><th>Tổng thu nhập</th><td id="payroll-print-gross"></td><th>Thuế TNCN</th><td id="payroll-print-tax"></td></tr>
+                <tr><th colspan="4"></th><th>Khấu trừ khác</th><td id="payroll-print-other"></td></tr>
+            </tbody>
+        </table>
+        <p class="payroll-print-footer">Phiếu lương được lập từ dữ liệu chấm công đã được quản trị viên phê duyệt.</p>
+    </div>
+
     <script type="module" src="script.js"></script>
 </body>
 </html>

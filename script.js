@@ -866,6 +866,7 @@ function renderEmployees() {
                     </div>
                     <div class="employee-actions">
                         <button type="button" class="btn-secondary" data-view-attendance="${escapeHtml(employee.uid)}">Xem công</button>
+                        <button type="button" class="btn-secondary" data-view-payroll="${escapeHtml(employee.uid)}">Tính lương</button>
                         <button type="button" class="btn-secondary" data-edit-employee="${escapeHtml(employee.uid)}">Sửa</button>
                         <button type="button" class="${employee.active === false ? 'btn-secondary' : 'btn-danger'}" data-toggle-employee="${escapeHtml(employee.uid)}">${employee.active === false ? 'Mở khóa' : 'Khóa'}</button>
                     </div>
@@ -877,6 +878,9 @@ function renderEmployees() {
     });
     list.querySelectorAll('[data-view-attendance]').forEach(button => {
         button.addEventListener('click', () => viewEmployeeAttendance(button.dataset.viewAttendance));
+    });
+    list.querySelectorAll('[data-view-payroll]').forEach(button => {
+        button.addEventListener('click', () => openPayrollModal(button.dataset.viewPayroll));
     });
     list.querySelectorAll('[data-toggle-employee]').forEach(button => {
         button.addEventListener('click', () => toggleEmployee(button.dataset.toggleEmployee));
@@ -1047,9 +1051,16 @@ async function editEmployeeAttendance(uid, date) {
         preConfirm: () => {
             const status = document.getElementById('adminRecordStatus').value;
             const isLeave = status.includes('Nghỉ');
+            const checkIn = document.getElementById('adminCheckIn').value.trim();
+            const checkOut = document.getElementById('adminCheckOut').value.trim();
+            if (!isLeave && ((checkIn && checkIn !== 'Chưa chấm' && parseTime(checkIn) === null)
+                || (checkOut && checkOut !== 'Chưa chấm' && parseTime(checkOut) === null))) {
+                Swal.showValidationMessage('Giờ vào/ra phải có định dạng HH:mm, ví dụ 08:00 hoặc 22:30.');
+                return undefined;
+            }
             return {
-                checkIn: isLeave ? 'Nghỉ' : (document.getElementById('adminCheckIn').value.trim() || 'Chưa chấm'),
-                checkOut: isLeave ? 'Nghỉ' : (document.getElementById('adminCheckOut').value.trim() || 'Chưa chấm'),
+                checkIn: isLeave ? 'Nghỉ' : (checkIn || 'Chưa chấm'),
+                checkOut: isLeave ? 'Nghỉ' : (checkOut || 'Chưa chấm'),
                 status
             };
         }
@@ -1075,13 +1086,27 @@ async function editEmployeeAttendance(uid, date) {
 async function editEmployee(uid) {
     const employee = employees.find(item => item.uid === uid);
     if (!employee) return;
+    const payroll = employee.payroll || {};
     const result = await Swal.fire({
         title: 'Sửa nhân viên',
         html: `
             <input id="employeeDisplayName" class="swal2-input" value="${escapeHtml(employee.displayName || '')}" placeholder="Tên hiển thị">
+            <input id="employeeDepartment" class="swal2-input" value="${escapeHtml(employee.department || '')}" placeholder="Phòng ban / Bộ phận">
             <select id="employeeRole" class="swal2-select">
                 ${['Nhân viên', 'Quản trị viên', 'Super Admin'].map(role => `<option value="${role}" ${String(employee.role || 'Nhân viên') === role ? 'selected' : ''}>${role}</option>`).join('')}
-            </select>`,
+            </select>
+            <div class="admin-payroll-form">
+                <strong>Thiết lập tính lương</strong>
+                <div class="admin-payroll-grid">
+                    <input id="employeeTotalSalary" class="swal2-input" type="number" min="0" step="1000" value="${Number(payroll.totalSalary || employee.totalSalary || 0)}" placeholder="Tổng lương">
+                    <input id="employeeInsuranceSalary" class="swal2-input" type="number" min="0" step="1000" value="${Number(payroll.insuranceSalary || employee.insuranceSalary || 0)}" placeholder="Lương BHXH">
+                    <input id="employeeAllowance" class="swal2-input" type="number" min="0" step="1000" value="${Number(payroll.allowance || 0)}" placeholder="Phụ cấp mặc định">
+                    <input id="employeeWorkDays" class="swal2-input" type="number" min="1" max="31" step="0.1" value="${Number(payroll.workDaysPerMonth || 26)}" placeholder="Ngày công chuẩn / tháng">
+                    <input id="employeeWorkHours" class="swal2-input" type="number" min="1" max="24" step="0.5" value="${Number(payroll.workHoursPerDay || 8)}" placeholder="Giờ chuẩn / ngày">
+                    <input id="employeeBreakMinutes" class="swal2-input" type="number" min="0" max="240" step="15" value="${Number(payroll.breakMinutes || 60)}" placeholder="Nghỉ giữa ca (phút)">
+                </div>
+                <small>BHXH tự động tính 10,5% trên lương BHXH. Admin vẫn có thể điều chỉnh các khoản khấu trừ trong phiếu lương.</small>
+            </div>`,
         showCancelButton: true,
         confirmButtonText: 'Lưu',
         cancelButtonText: 'Hủy',
@@ -1091,7 +1116,28 @@ async function editEmployee(uid) {
                 Swal.showValidationMessage('Vui lòng nhập tên nhân viên.');
                 return undefined;
             }
-            return { displayName, role: document.getElementById('employeeRole').value };
+            const totalSalary = Number(document.getElementById('employeeTotalSalary').value || 0);
+            const insuranceSalary = Number(document.getElementById('employeeInsuranceSalary').value || 0);
+            const workDaysPerMonth = Number(document.getElementById('employeeWorkDays').value || 26);
+            const workHoursPerDay = Number(document.getElementById('employeeWorkHours').value || 8);
+            const breakMinutes = Number(document.getElementById('employeeBreakMinutes').value || 60);
+            if (totalSalary < 0 || insuranceSalary < 0 || workDaysPerMonth <= 0 || workHoursPerDay <= 0 || breakMinutes < 0) {
+                Swal.showValidationMessage('Thông số lương phải là số hợp lệ và không âm.');
+                return undefined;
+            }
+            return {
+                displayName,
+                department: document.getElementById('employeeDepartment').value.trim(),
+                role: document.getElementById('employeeRole').value,
+                payroll: {
+                    totalSalary,
+                    insuranceSalary,
+                    allowance: Number(document.getElementById('employeeAllowance').value || 0),
+                    workDaysPerMonth,
+                    workHoursPerDay,
+                    breakMinutes
+                }
+            };
         }
     });
     if (!result.isConfirmed) return;
@@ -1099,7 +1145,7 @@ async function editEmployee(uid) {
         await setDoc(doc(db, 'users', uid), { ...result.value, updatedAt: serverTimestamp(), updatedBy: currentUser.uid }, { merge: true });
         await setDoc(doc(db, 'auditLogs', `${Date.now()}-${uid}`), {
             action: 'UPDATE_EMPLOYEE_PROFILE', employeeUid: uid,
-            before: { displayName: employee.displayName || '', role: employee.role || 'Nhân viên' },
+            before: { displayName: employee.displayName || '', role: employee.role || 'Nhân viên', department: employee.department || '', payroll: employee.payroll || {} },
             after: result.value, updatedBy: currentUser.uid, updatedAt: serverTimestamp()
         });
         await loadEmployees();
@@ -1130,6 +1176,216 @@ async function toggleEmployee(uid) {
         console.error(error);
         Swal.fire('Lỗi', 'Không thể cập nhật trạng thái nhân viên.', 'error');
     }
+}
+
+function formatCurrency(value) {
+    return `${Math.round(Number(value) || 0).toLocaleString('vi-VN')} đ`;
+}
+
+function getEmployeePayrollConfig(employee) {
+    const config = employee?.payroll || {};
+    return {
+        totalSalary: Number(config.totalSalary || employee?.totalSalary || 0),
+        insuranceSalary: Number(config.insuranceSalary || employee?.insuranceSalary || 0),
+        allowance: Number(config.allowance || 0),
+        workDaysPerMonth: Number(config.workDaysPerMonth || 26),
+        workHoursPerDay: Number(config.workHoursPerDay || 8),
+        breakMinutes: Number(config.breakMinutes ?? 60)
+    };
+}
+
+function calculatePayroll(employee, month, adjustments = {}) {
+    const config = getEmployeePayrollConfig(employee);
+    const records = (employeeAttendance.get(employee.uid) || [])
+        .filter(record => !month || String(record.date || '').startsWith(month));
+    const standardMinutes = config.workHoursPerDay * 60;
+    let workDayEquivalent = 0;
+    let paidLeaveDays = 0;
+    let unpaidLeaveDays = 0;
+    let totalWorkMinutes = 0;
+    let overtimeMinutes = 0;
+    let lateDays = 0;
+    let forgottenDays = 0;
+    let missingDays = 0;
+
+    records.forEach(record => {
+        const status = getEffectiveStatus(record);
+        if (status.includes('Nghỉ')) {
+            if (status.includes('Nghỉ phép')) paidLeaveDays += 1;
+            else unpaidLeaveDays += 1;
+            return;
+        }
+        if (status === 'Đi trễ') lateDays += 1;
+        if (status === 'Quên chấm công') forgottenDays += 1;
+        const checkIn = parseTime(record.checkIn);
+        const checkOut = parseTime(record.checkOut);
+        if (checkIn === null || checkOut === null || checkOut < checkIn) {
+            missingDays += 1;
+            return;
+        }
+        const elapsedMinutes = checkOut < checkIn ? checkOut + (24 * 60) - checkIn : checkOut - checkIn;
+        const netMinutes = Math.max(0, elapsedMinutes - config.breakMinutes);
+        totalWorkMinutes += netMinutes;
+        workDayEquivalent += Math.min(netMinutes, standardMinutes) / standardMinutes;
+        overtimeMinutes += Math.max(0, netMinutes - standardMinutes);
+    });
+
+    const dayRate = config.totalSalary / config.workDaysPerMonth;
+    const hourRate = dayRate / config.workHoursPerDay;
+    const workPay = dayRate * workDayEquivalent;
+    const leavePay = dayRate * paidLeaveDays;
+    const overtimePay = hourRate * (overtimeMinutes / 60) * 1.5;
+    const allowance = Number(adjustments.allowance ?? config.allowance);
+    const bonus = Number(adjustments.bonus || 0);
+    const insurance = config.insuranceSalary * 0.105;
+    const advance = Number(adjustments.advance || 0);
+    const tax = Number(adjustments.tax || 0);
+    const lateDeduction = Number(adjustments.lateDeduction || 0);
+    const forgottenDeduction = Number(adjustments.forgottenDeduction || 0);
+    const otherDeduction = Number(adjustments.otherDeduction || 0);
+    const grossPay = workPay + leavePay + overtimePay + allowance + bonus;
+    const totalDeduction = insurance + advance + tax + lateDeduction + forgottenDeduction + otherDeduction;
+
+    return {
+        month, config, records, workDayEquivalent, paidLeaveDays, unpaidLeaveDays, totalWorkMinutes,
+        overtimeMinutes, lateDays, forgottenDays, missingDays, dayRate, hourRate, workPay, leavePay,
+        overtimePay, allowance, bonus, insurance, advance, tax, lateDeduction, forgottenDeduction,
+        otherDeduction, grossPay, totalDeduction, netPay: grossPay - totalDeduction
+    };
+}
+
+function payrollInputValue(id) {
+    return Number(document.getElementById(id)?.value || 0);
+}
+
+function renderPayrollPreview(employee, month) {
+    const adjustments = {
+        allowance: payrollInputValue('payrollAllowance'),
+        bonus: payrollInputValue('payrollBonus'),
+        advance: payrollInputValue('payrollAdvance'),
+        tax: payrollInputValue('payrollTax'),
+        lateDeduction: payrollInputValue('payrollLateDeduction'),
+        forgottenDeduction: payrollInputValue('payrollForgottenDeduction'),
+        otherDeduction: payrollInputValue('payrollOtherDeduction')
+    };
+    const summary = calculatePayroll(employee, month, adjustments);
+    const valueMap = {
+        payrollWorkDays: summary.workDayEquivalent.toFixed(2),
+        payrollOvertimeHours: (summary.overtimeMinutes / 60).toFixed(2),
+        payrollLeaveDays: summary.paidLeaveDays.toFixed(2),
+        payrollWorkPay: formatCurrency(summary.workPay),
+        payrollLeavePay: formatCurrency(summary.leavePay),
+        payrollOvertimePay: formatCurrency(summary.overtimePay),
+        payrollInsurance: formatCurrency(summary.insurance),
+        payrollGross: formatCurrency(summary.grossPay),
+        payrollDeduction: formatCurrency(summary.totalDeduction),
+        payrollNet: formatCurrency(summary.netPay)
+    };
+    Object.entries(valueMap).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+    });
+    return { summary, adjustments };
+}
+
+async function openPayrollModal(uid) {
+    const employee = employees.find(item => item.uid === uid);
+    if (!employee) return;
+    const month = document.getElementById('adminMonth').value || todayStr.slice(0, 7);
+    const config = getEmployeePayrollConfig(employee);
+    const savedPayrollSnapshot = await getDoc(doc(db, 'users', uid, 'payroll', month));
+    const savedPayroll = savedPayrollSnapshot.exists() ? savedPayrollSnapshot.data() : {};
+    const initial = {
+        allowance: savedPayroll.allowance ?? config.allowance,
+        bonus: savedPayroll.bonus || 0,
+        advance: savedPayroll.advance || 0,
+        tax: savedPayroll.tax || 0,
+        lateDeduction: savedPayroll.lateDeduction || 0,
+        forgottenDeduction: savedPayroll.forgottenDeduction || 0,
+        otherDeduction: savedPayroll.otherDeduction || 0
+    };
+    const result = await Swal.fire({
+        title: `Phiếu lương tháng ${month.slice(5)}/${month.slice(0, 4)}`,
+        html: `
+            <div class="payroll-modal">
+                <div class="payroll-employee"><strong>${escapeHtml(employee.displayName || employee.email || 'Nhân viên')}</strong><span>${escapeHtml(employee.department || 'Chưa cập nhật phòng ban')} · ${escapeHtml(employee.email || '')}</span></div>
+                <div class="payroll-metrics"><div><small>Ngày công</small><strong id="payrollWorkDays">0</strong></div><div><small>Giờ tăng ca</small><strong id="payrollOvertimeHours">0</strong></div><div><small>Ngày phép</small><strong id="payrollLeaveDays">0</strong></div></div>
+                <div class="payroll-columns">
+                    <div><h4>Các khoản được hưởng</h4><p>Lương ngày công <b id="payrollWorkPay">0 đ</b></p><p>Lương nghỉ phép <b id="payrollLeavePay">0 đ</b></p><p>Lương tăng ca <b id="payrollOvertimePay">0 đ</b></p><label>Phụ cấp <input id="payrollAllowance" type="number" min="0" step="1000" value="${initial.allowance}"></label><label>Thưởng <input id="payrollBonus" type="number" min="0" step="1000" value="${initial.bonus}"></label></div>
+                    <div><h4>Các khoản phải thu</h4><p>Nộp BHXH (10,5%) <b id="payrollInsurance">0 đ</b></p><label>Ứng lương <input id="payrollAdvance" type="number" min="0" step="1000" value="${initial.advance}"></label><label>Thuế TNCN <input id="payrollTax" type="number" min="0" step="1000" value="${initial.tax}"></label><label>Khấu trừ đi trễ <input id="payrollLateDeduction" type="number" min="0" step="1000" value="${initial.lateDeduction}"></label><label>Khấu trừ quên công <input id="payrollForgottenDeduction" type="number" min="0" step="1000" value="${initial.forgottenDeduction}"></label><label>Khấu trừ khác <input id="payrollOtherDeduction" type="number" min="0" step="1000" value="${initial.otherDeduction}"></label></div>
+                </div>
+                <div class="payroll-total"><span>Tổng thu nhập <b id="payrollGross">0 đ</b></span><span>Tổng khấu trừ <b id="payrollDeduction">0 đ</b></span><strong>Thực nhận <em id="payrollNet">0 đ</em></strong></div>
+                <small class="payroll-note">Tăng ca được tính 150% theo giờ chuẩn. Thời gian giữa giờ vào và giờ ra đã trừ phút nghỉ giữa ca theo cấu hình nhân viên.</small>
+            </div>`,
+        showCancelButton: true,
+        confirmButtonText: 'Lưu & in phiếu lương',
+        cancelButtonText: 'Đóng',
+        width: 760,
+        customClass: { popup: 'payroll-popup' },
+        didOpen: () => {
+            ['payrollAllowance', 'payrollBonus', 'payrollAdvance', 'payrollTax', 'payrollLateDeduction', 'payrollForgottenDeduction', 'payrollOtherDeduction'].forEach(id => {
+                document.getElementById(id).addEventListener('input', () => renderPayrollPreview(employee, month));
+            });
+            renderPayrollPreview(employee, month);
+        },
+        preConfirm: () => renderPayrollPreview(employee, month)
+    });
+    if (!result.isConfirmed) return;
+    const { summary, adjustments } = result.value;
+    try {
+        await setDoc(doc(db, 'users', uid, 'payroll', month), {
+            ...adjustments,
+            month: summary.month,
+            workDayEquivalent: summary.workDayEquivalent,
+            paidLeaveDays: summary.paidLeaveDays,
+            overtimeMinutes: summary.overtimeMinutes,
+            workPay: summary.workPay,
+            leavePay: summary.leavePay,
+            overtimePay: summary.overtimePay,
+            insurance: summary.insurance,
+            grossPay: summary.grossPay,
+            totalDeduction: summary.totalDeduction,
+            netPay: summary.netPay,
+            employeeUid: uid,
+            updatedAt: serverTimestamp(),
+            updatedBy: currentUser.uid
+        });
+        preparePayrollPrint(employee, summary);
+        window.print();
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Lỗi', 'Không thể lưu phiếu lương. Hãy kiểm tra Firestore Rules.', 'error');
+    }
+}
+
+function preparePayrollPrint(employee, summary) {
+    const printSection = document.getElementById('payroll-print-section');
+    if (!printSection) return;
+    const setText = (id, value) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+    };
+    setText('payroll-print-name', employee.displayName || employee.email || 'Nhân viên');
+    setText('payroll-print-department', employee.department || 'Chưa cập nhật');
+    setText('payroll-print-month', `Tháng ${summary.month.slice(5)} năm ${summary.month.slice(0, 4)}`);
+    setText('payroll-print-total-salary', formatCurrency(summary.config.totalSalary));
+    setText('payroll-print-insurance-salary', formatCurrency(summary.config.insuranceSalary));
+    setText('payroll-print-work-days', summary.workDayEquivalent.toFixed(2));
+    setText('payroll-print-leave-days', summary.paidLeaveDays.toFixed(2));
+    setText('payroll-print-overtime-hours', (summary.overtimeMinutes / 60).toFixed(2));
+    setText('payroll-print-work-pay', formatCurrency(summary.workPay));
+    setText('payroll-print-leave-pay', formatCurrency(summary.leavePay));
+    setText('payroll-print-overtime-pay', formatCurrency(summary.overtimePay));
+    setText('payroll-print-allowance', formatCurrency(summary.allowance));
+    setText('payroll-print-bonus', formatCurrency(summary.bonus));
+    setText('payroll-print-gross', formatCurrency(summary.grossPay));
+    setText('payroll-print-insurance', formatCurrency(summary.insurance));
+    setText('payroll-print-advance', formatCurrency(summary.advance));
+    setText('payroll-print-tax', formatCurrency(summary.tax));
+    setText('payroll-print-late', formatCurrency(summary.lateDeduction));
+    setText('payroll-print-forgotten', formatCurrency(summary.forgottenDeduction));
+    setText('payroll-print-other', formatCurrency(summary.otherDeduction));
+    setText('payroll-print-net', formatCurrency(summary.netPay));
 }
 
 document.getElementById('employeeSearch').addEventListener('input', renderEmployees);
