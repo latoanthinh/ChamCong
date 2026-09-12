@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, collection, getDocs, getDoc, setDoc, doc, query, orderBy, writeBatch, serverTimestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCj1poSyx9DNXgeA27BP4-M-F1KV5ETFRI",
@@ -83,6 +83,7 @@ function setLoginMode(asAdmin) {
     const adminMode = document.getElementById('adminLoginMode');
     employeeMode.classList.toggle('active', !asAdmin);
     adminMode.classList.toggle('active', asAdmin);
+    document.querySelector('.login-mode')?.classList.toggle('is-admin', asAdmin);
     employeeMode.setAttribute('aria-selected', String(!asAdmin));
     adminMode.setAttribute('aria-selected', String(asAdmin));
     document.getElementById('authDescription').textContent = asAdmin
@@ -116,7 +117,8 @@ loginForm.addEventListener('submit', async (event) => {
     loginBtn.disabled = true;
     setLoginButtonLabel('Đang đăng nhập...');
     try {
-        await setPersistence(auth, browserLocalPersistence);
+        const rememberLogin = document.getElementById('rememberLogin')?.checked ?? true;
+        await setPersistence(auth, rememberLogin ? browserLocalPersistence : browserSessionPersistence);
         const email = normalizeLoginIdentifier(document.getElementById('loginEmail').value);
         if (loginAsAdmin && email !== adminEmail) {
             throw { code: 'auth/admin-email-required' };

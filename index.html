@@ -51,6 +51,7 @@
                 <p id="authDescription">Sử dụng tài khoản được cấp để xem dữ liệu cá nhân.</p>
             </div>
             <div class="login-mode" role="tablist" aria-label="Loại tài khoản">
+                <span class="login-mode-indicator" aria-hidden="true"></span>
                 <button id="employeeLoginMode" type="button" class="active" role="tab" aria-selected="true">Nhân viên</button>
                 <button id="adminLoginMode" type="button" role="tab" aria-selected="false">Quản trị viên</button>
             </div>
@@ -66,6 +67,11 @@
                         <button id="togglePasswordBtn" type="button" class="password-toggle" aria-label="Hiện mật khẩu" title="Hiện/ẩn mật khẩu">👁</button>
                     </div>
                 </div>
+                <label class="remember-login">
+                    <input id="rememberLogin" type="checkbox" checked>
+                    <span class="remember-check" aria-hidden="true"></span>
+                    <span>Ghi nhớ đăng nhập trên thiết bị này</span>
+                </label>
                 <div id="authError" class="auth-error" role="alert"></div>
                 <button id="loginBtn" type="submit" class="btn-primary">
                     <span id="loginBtnText">Đăng nhập</span>

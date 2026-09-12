@@ -269,6 +269,7 @@ button:disabled {
 }
 
 .login-mode {
+    position: relative;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 5px;
@@ -278,7 +279,26 @@ button:disabled {
     margin-bottom: 24px;
 }
 
+.login-mode-indicator {
+    position: absolute;
+    z-index: 0;
+    top: 4px;
+    left: 4px;
+    width: calc((100% - 13px) / 2);
+    height: calc(100% - 8px);
+    border-radius: 9px;
+    background: white;
+    box-shadow: 0 3px 12px rgba(16, 42, 67, 0.1);
+    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.login-mode.is-admin .login-mode-indicator {
+    transform: translateX(calc(100% + 5px));
+}
+
 .login-mode button {
+    position: relative;
+    z-index: 1;
     padding: 11px;
     border-radius: 9px;
     background: transparent;
@@ -286,13 +306,69 @@ button:disabled {
     box-shadow: none;
     font-weight: 600;
     font-size: 0.87rem;
-    transition: background var(--transition), color var(--transition), box-shadow var(--transition);
+    transition: color 0.22s ease;
 }
 
 .login-mode button.active {
-    background: white;
     color: var(--navy);
-    box-shadow: 0 3px 12px rgba(16, 42, 67, 0.1);
+}
+
+.remember-login {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: -2px 0 8px;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    cursor: pointer;
+    user-select: none;
+}
+
+.remember-login input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.remember-check {
+    display: grid;
+    place-items: center;
+    width: 17px;
+    height: 17px;
+    flex: 0 0 17px;
+    border: 1px solid #b8c9d9;
+    border-radius: 5px;
+    background: #fbfcfd;
+    transition: background var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+.remember-check::after {
+    content: '';
+    width: 8px;
+    height: 4px;
+    border: solid white;
+    border-width: 0 0 2px 2px;
+    transform: rotate(-45deg) scale(0);
+    transition: transform 0.16s ease;
+}
+
+.remember-login input:checked + .remember-check {
+    border-color: var(--blue);
+    background: var(--blue);
+    box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.12);
+}
+
+.remember-login input:checked + .remember-check::after {
+    transform: rotate(-45deg) scale(1);
+}
+
+.remember-login input:focus-visible + .remember-check {
+    box-shadow: var(--focus);
 }
 
 .form-group {
