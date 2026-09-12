@@ -985,6 +985,9 @@ input[readonly] {
     font-weight: 600;
 }
 
+.month-stat.is-overtime strong { color: var(--amber); }
+.month-stat.is-payroll strong { color: var(--teal); font-size: 1rem; }
+
 .quick-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1466,6 +1469,9 @@ input[readonly] {
 }
 
 .admin-payroll-form {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
     margin: 14px 0 4px;
     padding: 12px;
     border: 1px solid #dbe5ef;
@@ -1485,12 +1491,47 @@ input[readonly] {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
+    min-width: 0;
 }
 
 .admin-payroll-grid .swal2-input {
     width: 100%;
     margin: 0;
     font-size: 0.78rem;
+}
+
+.admin-payroll-input {
+    min-width: 0;
+    display: block;
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.68rem;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.admin-payroll-input span {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.swal2-popup {
+    max-width: calc(100vw - 24px) !important;
+    overflow-x: hidden;
+}
+
+.swal2-html-container {
+    max-width: 100%;
+    overflow-x: hidden !important;
+}
+
+.swal2-popup .swal2-input,
+.swal2-popup .swal2-select {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin-left: 0;
+    margin-right: 0;
 }
 
 .admin-payroll-form small,

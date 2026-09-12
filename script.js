@@ -274,6 +274,20 @@ function updateMonthStats() {
     setStat('statLeaveDays', leave);
     setStat('statLateDays', late);
     setStat('statMissingDays', missing);
+    setStat('statOvertimeHours', Number(currentMonthPayroll?.overtimeHours || 0).toFixed(2));
+    setStat('statOvertimePay', formatCurrency(currentMonthPayroll?.overtimePay || 0));
+}
+
+async function loadEmployeePayrollSummary(month) {
+    currentMonthPayroll = null;
+    if (!currentUser) return;
+    try {
+        const payrollSnapshot = await getDoc(doc(db, 'users', currentUser.uid, 'payroll', month));
+        currentMonthPayroll = payrollSnapshot.exists() ? payrollSnapshot.data() : null;
+    } catch (error) {
+        console.error(error);
+    }
+    updateMonthStats();
 }
 
 function updateLiveClock() {
@@ -337,6 +351,7 @@ document.getElementById('reportMonth').value = todayStr.slice(0, 7);
 
 let globalAttendanceData = [];
 let todayExistingRecord = null;
+let currentMonthPayroll = null;
 const fixedHolidayNames = {
     '01-01': 'Tết Dương lịch',
     '04-30': 'Ngày Giải phóng miền Nam',
@@ -668,7 +683,7 @@ function normalizeEarlyLeaveRecord(record) {
     if (checkOutMinutes === null) return { record, changed: false };
 
     const roundedCheckOut = roundCheckOutTime(checkOutMinutes);
-    const standardOutMinutes = 18 * 60 + 30;
+    const standardOutMinutes = 17 * 60;
     const normalizedStatus = roundedCheckOut.minutes < standardOutMinutes
         ? `Về sớm ${getEarlyLeaveText(standardOutMinutes - roundedCheckOut.minutes)}`
         : 'Đi làm';
@@ -736,6 +751,7 @@ function renderAttendanceList() {
 document.getElementById('reportMonth').addEventListener('change', () => {
     renderAttendanceList();
     updateMonthStats();
+    loadEmployeePayrollSummary(document.getElementById('reportMonth').value || todayStr.slice(0, 7));
 });
 document.getElementById('reportStatus').addEventListener('change', renderAttendanceList);
 
@@ -1098,14 +1114,14 @@ async function editEmployee(uid) {
             <div class="admin-payroll-form">
                 <strong>Thiết lập tính lương</strong>
                 <div class="admin-payroll-grid">
-                    <input id="employeeTotalSalary" class="swal2-input" inputmode="numeric" value="${formatNumberInput(payroll.totalSalary || employee.totalSalary || 8200000)}" placeholder="Tổng lương">
-                    <input id="employeeInsuranceSalary" class="swal2-input" inputmode="numeric" value="${formatNumberInput(payroll.insuranceSalary || employee.insuranceSalary || 5681800)}" placeholder="Lương BHXH">
-                    <input id="employeeAllowance" class="swal2-input" inputmode="numeric" value="${formatNumberInput(payroll.allowance || 0)}" placeholder="Phụ cấp mặc định">
-                    <input id="employeeWorkDays" class="swal2-input" type="number" min="1" max="31" step="0.1" value="${Number(payroll.workDaysPerMonth || 26)}" placeholder="Ngày công chuẩn / tháng">
-                    <input id="employeeWorkHours" class="swal2-input" type="number" min="1" max="24" step="0.5" value="${Number(payroll.workHoursPerDay || 8)}" placeholder="Giờ chuẩn / ngày">
-                    <input id="employeeBreakMinutes" class="swal2-input" type="number" min="0" max="240" step="15" value="${Number(payroll.breakMinutes || 60)}" placeholder="Nghỉ giữa ca (phút)">
+                    <label class="admin-payroll-input"><span>Tổng lương / tháng</span><input id="employeeTotalSalary" class="swal2-input" inputmode="numeric" value="${formatNumberInput(payroll.totalSalary || employee.totalSalary || 8200000)}"></label>
+                    <label class="admin-payroll-input"><span>Lương đóng BHXH</span><input id="employeeInsuranceSalary" class="swal2-input" inputmode="numeric" value="${formatNumberInput(payroll.insuranceSalary || employee.insuranceSalary || 5681800)}"></label>
+                    <label class="admin-payroll-input"><span>Phụ cấp mặc định</span><input id="employeeAllowance" class="swal2-input" inputmode="numeric" value="${formatNumberInput(payroll.allowance || 0)}"></label>
+                    <label class="admin-payroll-input"><span>Giờ chuẩn / ngày</span><input id="employeeWorkHours" class="swal2-input" type="number" min="1" max="24" step="0.5" value="${Number(payroll.workHoursPerDay || 8)}"></label>
+                    <label class="admin-payroll-input"><span>Nghỉ giữa ca (phút)</span><input id="employeeBreakMinutes" class="swal2-input" type="number" min="0" max="240" step="15" value="${Number(payroll.breakMinutes || 60)}"></label>
+                    <label class="admin-payroll-input"><span>Hệ số tăng ca</span><input id="employeeOvertimeMultiplier" class="swal2-input" type="number" min="1" max="3" step="0.1" value="${Number(payroll.overtimeMultiplier || 1.5)}"></label>
                 </div>
-                <small>BHXH tự động tính 10,5% trên lương BHXH. Admin vẫn có thể điều chỉnh các khoản khấu trừ trong phiếu lương.</small>
+                <small>Tiền công 1 ngày tự động tính theo số ngày thực tế của tháng: 30 hoặc 31 ngày. BHXH tự động tính 10,5% trên lương đóng BHXH.</small>
             </div>`,
         showCancelButton: true,
         confirmButtonText: 'Lưu',
@@ -1119,10 +1135,11 @@ async function editEmployee(uid) {
             }
             const totalSalary = parseNumberInput(document.getElementById('employeeTotalSalary').value);
             const insuranceSalary = parseNumberInput(document.getElementById('employeeInsuranceSalary').value);
-            const workDaysPerMonth = Number(document.getElementById('employeeWorkDays').value || 26);
+            const workDaysPerMonth = 30;
             const workHoursPerDay = Number(document.getElementById('employeeWorkHours').value || 8);
             const breakMinutes = Number(document.getElementById('employeeBreakMinutes').value || 60);
-            if (totalSalary < 0 || insuranceSalary < 0 || workDaysPerMonth <= 0 || workHoursPerDay <= 0 || breakMinutes < 0) {
+            const overtimeMultiplier = Number(document.getElementById('employeeOvertimeMultiplier').value || 1.5);
+            if (totalSalary < 0 || insuranceSalary < 0 || workDaysPerMonth <= 0 || workHoursPerDay <= 0 || breakMinutes < 0 || overtimeMultiplier < 1 || overtimeMultiplier > 3) {
                 Swal.showValidationMessage('Thông số lương phải là số hợp lệ và không âm.');
                 return undefined;
             }
@@ -1136,7 +1153,8 @@ async function editEmployee(uid) {
                     allowance: parseNumberInput(document.getElementById('employeeAllowance').value),
                     workDaysPerMonth,
                     workHoursPerDay,
-                    breakMinutes
+                    breakMinutes,
+                    overtimeMultiplier
                 }
             };
         }
@@ -1202,7 +1220,8 @@ function getEmployeePayrollConfig(employee) {
         allowance: Number(config.allowance || 0),
         workDaysPerMonth: Number(config.workDaysPerMonth || 30),
         workHoursPerDay: Number(config.workHoursPerDay || 8),
-        breakMinutes: Number(config.breakMinutes ?? 60)
+        breakMinutes: Number(config.breakMinutes ?? 60),
+        overtimeMultiplier: Number(config.overtimeMultiplier || 1.5)
     };
 }
 
@@ -1219,6 +1238,7 @@ function calculatePayroll(employee, month, adjustments = {}) {
     let lateDays = 0;
     let forgottenDays = 0;
     let missingDays = 0;
+    let earlyLeaveMinutes = 0;
 
     records.forEach(record => {
         const status = getEffectiveStatus(record);
@@ -1239,7 +1259,10 @@ function calculatePayroll(employee, month, adjustments = {}) {
         const netMinutes = Math.max(0, elapsedMinutes - config.breakMinutes);
         totalWorkMinutes += netMinutes;
         workDayEquivalent += Math.min(netMinutes, standardMinutes) / standardMinutes;
-        overtimeMinutes += Math.max(0, netMinutes - standardMinutes);
+        const scheduledEnd = (8 * 60) + standardMinutes + config.breakMinutes;
+        if (checkOut < scheduledEnd) {
+            earlyLeaveMinutes += scheduledEnd - checkOut;
+        }
     });
 
     const monthDays = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
@@ -1252,21 +1275,24 @@ function calculatePayroll(employee, month, adjustments = {}) {
     const overtimeHours = adjustments.overtimeHours === undefined
         ? overtimeMinutes / 60
         : Math.max(0, Number(adjustments.overtimeHours) || 0);
-    const overtimePay = hourRate * overtimeHours * 1.5;
+    const overtimePay = hourRate * overtimeHours * config.overtimeMultiplier;
     const allowance = Number(adjustments.allowance ?? config.allowance);
     const bonus = Number(adjustments.bonus || 0);
     const insurance = config.insuranceSalary * 0.105;
     const advance = Number(adjustments.advance || 0);
     const tax = Number(adjustments.tax || 0);
-    const lateDeduction = Number(adjustments.lateDeduction || 0);
-    const forgottenDeduction = Number(adjustments.forgottenDeduction || 0);
+    const earlyLeaveDeduction = (hourRate / 60) * earlyLeaveMinutes;
+    const automaticLateDeduction = lateDays * 50000;
+    const automaticForgottenDeduction = forgottenDays * 20000;
+    const lateDeduction = adjustments.lateDeduction === undefined ? automaticLateDeduction : Number(adjustments.lateDeduction || 0);
+    const forgottenDeduction = adjustments.forgottenDeduction === undefined ? automaticForgottenDeduction : Number(adjustments.forgottenDeduction || 0);
     const otherDeduction = Number(adjustments.otherDeduction || 0);
     const grossPay = workPay + leavePay + overtimePay + allowance + bonus;
-    const totalDeduction = insurance + advance + tax + lateDeduction + forgottenDeduction + otherDeduction;
+    const totalDeduction = insurance + advance + tax + lateDeduction + forgottenDeduction + earlyLeaveDeduction + otherDeduction;
 
     return {
         month, config, records, monthDays, requestedPaidLeaveDays, workDayEquivalent, paidLeaveDays, unpaidLeaveDays, totalWorkMinutes,
-        overtimeMinutes, lateDays, forgottenDays, missingDays, dayRate, hourRate, workPay, leavePay,
+        overtimeMinutes, lateDays, forgottenDays, missingDays, earlyLeaveMinutes, earlyLeaveDeduction, dayRate, hourRate, workPay, leavePay,
         overtimeHours, overtimePay, allowance, bonus, insurance, advance, tax, lateDeduction, forgottenDeduction,
         otherDeduction, grossPay, totalDeduction, netPay: grossPay - totalDeduction
     };
@@ -1303,6 +1329,7 @@ function renderPayrollPreview(employee, month) {
         payrollWorkDays: summary.workDayEquivalent.toFixed(2),
         payrollOvertimeHours: summary.overtimeHours.toFixed(2),
         payrollLeaveDays: summary.paidLeaveDays.toFixed(2),
+        payrollEarlyLeaveDeduction: formatCurrency(summary.earlyLeaveDeduction),
         payrollUnpaidLeaveDays: summary.unpaidLeaveDays.toFixed(2),
         payrollWorkPay: formatCurrency(summary.workPay),
         payrollLeavePay: formatCurrency(summary.leavePay),
@@ -1333,8 +1360,8 @@ async function openPayrollModal(uid) {
         overtimeHours: savedPayroll.overtimeHours ?? calculatedDefault.overtimeHours,
         advance: savedPayroll.advance || 0,
         tax: savedPayroll.tax || 0,
-        lateDeduction: savedPayroll.lateDeduction || 0,
-        forgottenDeduction: savedPayroll.forgottenDeduction || 0,
+        lateDeduction: savedPayroll.lateDeduction ?? calculatedDefault.lateDeduction,
+        forgottenDeduction: savedPayroll.forgottenDeduction ?? calculatedDefault.forgottenDeduction,
         otherDeduction: savedPayroll.otherDeduction || 0
     };
     const result = await Swal.fire({
@@ -1344,11 +1371,11 @@ async function openPayrollModal(uid) {
                 <div class="payroll-employee"><strong>${escapeHtml(employee.displayName || employee.email || 'Nhân viên')}</strong><span>${escapeHtml(employee.department || 'Chưa cập nhật phòng ban')} · ${escapeHtml(employee.email || '')}</span></div>
                 <div class="payroll-metrics"><div><small>Ngày công</small><strong id="payrollWorkDays">0</strong></div><div><small>Giờ tăng ca admin xác nhận</small><strong id="payrollOvertimeHours">0</strong></div><div><small>Phép có lương</small><strong id="payrollLeaveDays">0</strong></div></div>
                 <div class="payroll-columns">
-                    <div><h4>Các khoản được hưởng</h4><label>Giờ tăng ca admin xác nhận <input id="payrollOvertimeHoursInput" type="number" min="0" step="0.25" value="${initial.overtimeHours}"></label><p>Lương ngày công <b id="payrollWorkPay">0 đ</b></p><p>Lương nghỉ phép <b id="payrollLeavePay">0 đ</b></p><p>Lương tăng ca (150%) <b id="payrollOvertimePay">0 đ</b></p><label>Phụ cấp <input id="payrollAllowance" inputmode="numeric" value="${formatNumberInput(initial.allowance)}"></label><label>Thưởng <input id="payrollBonus" inputmode="numeric" value="${formatNumberInput(initial.bonus)}"></label></div>
-                    <div><h4>Các khoản phải thu</h4><p>Nộp BHXH (10,5%) <b id="payrollInsurance">0 đ</b></p><label>Ứng lương <input id="payrollAdvance" inputmode="numeric" value="${formatNumberInput(Math.min(initial.advance, 4000000))}"></label><small>Giới hạn tối đa: 4.000.000 đ</small><label>Thuế TNCN <input id="payrollTax" inputmode="numeric" value="${formatNumberInput(initial.tax)}"></label><label>Khấu trừ đi trễ <input id="payrollLateDeduction" inputmode="numeric" value="${formatNumberInput(initial.lateDeduction)}"></label><label>Khấu trừ quên công <input id="payrollForgottenDeduction" inputmode="numeric" value="${formatNumberInput(initial.forgottenDeduction)}"></label><label>Khấu trừ khác <input id="payrollOtherDeduction" inputmode="numeric" value="${formatNumberInput(initial.otherDeduction)}"></label></div>
+                    <div><h4>Các khoản được hưởng</h4><label>Giờ tăng ca admin xác nhận <input id="payrollOvertimeHoursInput" type="number" min="0" step="0.25" value="${initial.overtimeHours}"></label><p>Lương ngày công <b id="payrollWorkPay">0 đ</b></p><p>Tổng tiền phép có lương <b id="payrollLeavePay">0 đ</b></p><p>Lương tăng ca (${config.overtimeMultiplier}x) <b id="payrollOvertimePay">0 đ</b></p><label>Phụ cấp <input id="payrollAllowance" inputmode="numeric" value="${formatNumberInput(initial.allowance)}"></label><label>Thưởng <input id="payrollBonus" inputmode="numeric" value="${formatNumberInput(initial.bonus)}"></label></div>
+                    <div><h4>Các khoản phải thu</h4><p>Nộp BHXH (10,5%) <b id="payrollInsurance">0 đ</b></p><p>Khấu trừ về sớm <b id="payrollEarlyLeaveDeduction">0 đ</b></p><label>Ứng lương <input id="payrollAdvance" inputmode="numeric" value="${formatNumberInput(Math.min(initial.advance, 4000000))}"></label><small>Giới hạn tối đa: 4.000.000 đ</small><label>Thuế TNCN <input id="payrollTax" inputmode="numeric" value="${formatNumberInput(initial.tax)}"></label><label>Khấu trừ đi trễ (50.000/ngày) <input id="payrollLateDeduction" inputmode="numeric" value="${formatNumberInput(initial.lateDeduction)}"></label><label>Khấu trừ quên công (20.000/ngày) <input id="payrollForgottenDeduction" inputmode="numeric" value="${formatNumberInput(initial.forgottenDeduction)}"></label><label>Khấu trừ khác <input id="payrollOtherDeduction" inputmode="numeric" value="${formatNumberInput(initial.otherDeduction)}"></label></div>
                 </div>
                 <div class="payroll-total"><span>Tổng thu nhập <b id="payrollGross">0 đ</b></span><span>Tổng khấu trừ <b id="payrollDeduction">0 đ</b></span><strong>Thực nhận <em id="payrollNet">0 đ</em></strong></div>
-                <small class="payroll-note">Tăng ca được tính 150% theo giờ chuẩn. Thời gian giữa giờ vào và giờ ra đã trừ phút nghỉ giữa ca theo cấu hình nhân viên.</small>
+                <small class="payroll-note">Tối đa 3 ngày nghỉ phép được hưởng lương trong tháng. Ngày vượt phép không tính lương. Tăng ca tính theo số giờ admin xác nhận và hệ số ${config.overtimeMultiplier}x.</small>
             </div>`,
         showCancelButton: true,
         confirmButtonText: 'Lưu & in phiếu lương',
@@ -1383,6 +1410,7 @@ async function openPayrollModal(uid) {
             workPay: summary.workPay,
             leavePay: summary.leavePay,
             overtimePay: summary.overtimePay,
+            earlyLeaveDeduction: summary.earlyLeaveDeduction,
             insurance: summary.insurance,
             grossPay: summary.grossPay,
             totalDeduction: summary.totalDeduction,
@@ -1422,6 +1450,7 @@ function preparePayrollPrint(employee, summary) {
     setText('payroll-print-bonus', formatCurrency(summary.bonus));
     setText('payroll-print-gross', formatCurrency(summary.grossPay));
     setText('payroll-print-insurance', formatCurrency(summary.insurance));
+    setText('payroll-print-early-leave', formatCurrency(summary.earlyLeaveDeduction));
     setText('payroll-print-advance', formatCurrency(summary.advance));
     setText('payroll-print-tax', formatCurrency(summary.tax));
     setText('payroll-print-late', formatCurrency(summary.lateDeduction));
@@ -1549,7 +1578,7 @@ window.saveAttendance = async function () {
             // --- LẦN 2: CHẤM CÔNG RA ---
             if (totalCurrentMinutes >= 12 * 60) {
                 const roundedCheckOut = roundCheckOutTime(totalCurrentMinutes);
-                const standardOutMinutes = 18 * 60 + 30;
+                const standardOutMinutes = 17 * 60;
                 calculatedCheckOut = roundedCheckOut.text;
                 if (roundedCheckOut.minutes < standardOutMinutes) {
                     const diffMinutes = standardOutMinutes - roundedCheckOut.minutes;
@@ -1638,6 +1667,7 @@ async function loadAttendance() {
                     <strong>Chưa có dữ liệu chấm công</strong>
                     <span>Hãy ghi nhận ngày công đầu tiên của bạn.</span>
                 </div>`;
+            await loadEmployeePayrollSummary(document.getElementById('reportMonth').value || todayStr.slice(0, 7));
             updateButtonState();
             updateMonthStats();
             renderCalendar();
@@ -1674,6 +1704,7 @@ async function loadAttendance() {
         if (migrationBatches.length) await Promise.all(migrationBatches);
 
         globalAttendanceData.sort((a, b) => b.date.localeCompare(a.date));
+        await loadEmployeePayrollSummary(document.getElementById('reportMonth').value || todayStr.slice(0, 7));
 
         if (todayExistingRecord) {
             const statusSelect = document.getElementById('status');
