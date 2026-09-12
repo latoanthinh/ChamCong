@@ -111,6 +111,19 @@ function setLoginButtonLabel(text) {
     else loginBtn.textContent = text;
 }
 
+function resetLoginForm() {
+    loginForm.reset();
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginPassword').type = 'password';
+    document.getElementById('authError').textContent = '';
+    document.getElementById('loginBtn').disabled = false;
+    document.getElementById('togglePasswordBtn').textContent = '👁';
+    document.getElementById('togglePasswordBtn').setAttribute('aria-label', 'Hiện mật khẩu');
+    setLoginButtonLabel('Đăng nhập');
+    setLoginMode(false);
+}
+
 loginForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     authError.textContent = '';
@@ -1705,6 +1718,7 @@ onAuthStateChanged(auth, async (user) => {
     showPageLoader(user ? 'Đang tải dữ liệu tài khoản...' : 'Đang kiểm tra phiên đăng nhập...');
     currentUser = user;
     if (!user) {
+        resetLoginForm();
         authScreen.classList.remove('hidden');
         appScreen.classList.add('hidden');
         attendanceCollection = null;
