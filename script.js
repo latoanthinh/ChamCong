@@ -1344,8 +1344,8 @@ async function openPayrollModal(uid) {
                 <div class="payroll-employee"><strong>${escapeHtml(employee.displayName || employee.email || 'Nhân viên')}</strong><span>${escapeHtml(employee.department || 'Chưa cập nhật phòng ban')} · ${escapeHtml(employee.email || '')}</span></div>
                 <div class="payroll-metrics"><div><small>Ngày công</small><strong id="payrollWorkDays">0</strong></div><div><small>Giờ tăng ca admin xác nhận</small><strong id="payrollOvertimeHours">0</strong></div><div><small>Phép có lương</small><strong id="payrollLeaveDays">0</strong></div></div>
                 <div class="payroll-columns">
-                    <div><h4>Các khoản được hưởng</h4><label>Giờ tăng ca admin xác nhận <input id="payrollOvertimeHoursInput" type="number" min="0" step="0.25" value="${initial.overtimeHours}"></label><p>Lương ngày công <b id="payrollWorkPay">0 đ</b></p><p>Lương nghỉ phép <b id="payrollLeavePay">0 đ</b></p><p>Lương tăng ca (150%) <b id="payrollOvertimePay">0 đ</b></p><label>Phụ cấp <input id="payrollAllowance" type="number" min="0" step="1000" value="${initial.allowance}"></label><label>Thưởng <input id="payrollBonus" type="number" min="0" step="1000" value="${initial.bonus}"></label></div>
-                    <div><h4>Các khoản phải thu</h4><p>Nộp BHXH (10,5%) <b id="payrollInsurance">0 đ</b></p><label>Ứng lương <input id="payrollAdvance" type="number" min="0" step="1000" value="${initial.advance}"></label><label>Thuế TNCN <input id="payrollTax" type="number" min="0" step="1000" value="${initial.tax}"></label><label>Khấu trừ đi trễ <input id="payrollLateDeduction" type="number" min="0" step="1000" value="${initial.lateDeduction}"></label><label>Khấu trừ quên công <input id="payrollForgottenDeduction" type="number" min="0" step="1000" value="${initial.forgottenDeduction}"></label><label>Khấu trừ khác <input id="payrollOtherDeduction" type="number" min="0" step="1000" value="${initial.otherDeduction}"></label></div>
+                    <div><h4>Các khoản được hưởng</h4><label>Giờ tăng ca admin xác nhận <input id="payrollOvertimeHoursInput" type="number" min="0" step="0.25" value="${initial.overtimeHours}"></label><p>Lương ngày công <b id="payrollWorkPay">0 đ</b></p><p>Lương nghỉ phép <b id="payrollLeavePay">0 đ</b></p><p>Lương tăng ca (150%) <b id="payrollOvertimePay">0 đ</b></p><label>Phụ cấp <input id="payrollAllowance" inputmode="numeric" value="${formatNumberInput(initial.allowance)}"></label><label>Thưởng <input id="payrollBonus" inputmode="numeric" value="${formatNumberInput(initial.bonus)}"></label></div>
+                    <div><h4>Các khoản phải thu</h4><p>Nộp BHXH (10,5%) <b id="payrollInsurance">0 đ</b></p><label>Ứng lương <input id="payrollAdvance" inputmode="numeric" value="${formatNumberInput(Math.min(initial.advance, 4000000))}"></label><small>Giới hạn tối đa: 4.000.000 đ</small><label>Thuế TNCN <input id="payrollTax" inputmode="numeric" value="${formatNumberInput(initial.tax)}"></label><label>Khấu trừ đi trễ <input id="payrollLateDeduction" inputmode="numeric" value="${formatNumberInput(initial.lateDeduction)}"></label><label>Khấu trừ quên công <input id="payrollForgottenDeduction" inputmode="numeric" value="${formatNumberInput(initial.forgottenDeduction)}"></label><label>Khấu trừ khác <input id="payrollOtherDeduction" inputmode="numeric" value="${formatNumberInput(initial.otherDeduction)}"></label></div>
                 </div>
                 <div class="payroll-total"><span>Tổng thu nhập <b id="payrollGross">0 đ</b></span><span>Tổng khấu trừ <b id="payrollDeduction">0 đ</b></span><strong>Thực nhận <em id="payrollNet">0 đ</em></strong></div>
                 <small class="payroll-note">Tăng ca được tính 150% theo giờ chuẩn. Thời gian giữa giờ vào và giờ ra đã trừ phút nghỉ giữa ca theo cấu hình nhân viên.</small>
@@ -1362,7 +1362,13 @@ async function openPayrollModal(uid) {
             });
             renderPayrollPreview(employee, month);
         },
-        preConfirm: () => renderPayrollPreview(employee, month)
+        preConfirm: () => {
+            if (payrollInputValue('payrollAdvance') > 4000000) {
+                Swal.showValidationMessage('Ứng lương tối đa là 4.000.000 đ.');
+                return undefined;
+            }
+            return renderPayrollPreview(employee, month);
+        }
     });
     if (!result.isConfirmed) return;
     const { summary, adjustments } = result.value;
