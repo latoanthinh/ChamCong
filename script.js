@@ -26,6 +26,7 @@ let currentUser = null;
 let attendanceCollection = null;
 let employees = [];
 let employeeAttendance = new Map();
+let attendanceSchedules = {};
 
 const pageLoader = document.getElementById('pageLoader');
 const pageLoaderText = document.getElementById('pageLoaderText');
@@ -201,11 +202,20 @@ function updateTodayStatusCard() {
     const hint = document.getElementById('todayStatusHint');
     const checkInLabel = document.getElementById('todayCheckInLabel');
     const checkOutLabel = document.getElementById('todayCheckOutLabel');
+    const scheduleNote = document.getElementById('todayScheduleNote');
     if (!card || !label || !hint || !checkInLabel || !checkOutLabel) return;
+
+    const todaySchedule = getAttendanceSchedule(todayStr);
+    if (scheduleNote) {
+        scheduleNote.classList.toggle('hidden', !todaySchedule);
+        if (todaySchedule) {
+            scheduleNote.textContent = `Lịch tăng ca hôm nay: giờ vào dự kiến ${todaySchedule.checkInTime} (có thể chấm sớm tối đa 60 phút), giờ ra dự kiến ${todaySchedule.checkOutTime}.`;
+        }
+    }
 
     card.classList.remove('is-work', 'is-leave', 'is-late', 'is-partial', 'is-done');
 
-    if (todayHoliday) {
+    if (todayHoliday && !todaySchedule) {
         label.textContent = `Nghỉ lễ: ${todayHoliday.name}`;
         hint.textContent = 'Hôm nay là ngày nghỉ theo quy định. Không cần chấm công.';
         checkInLabel.textContent = '—';
@@ -318,6 +328,12 @@ window.liveClockTimer = setInterval(updateLiveClock, 1000);
 function getUserAttendanceCollection() {
     if (!currentUser) throw new Error('Chưa đăng nhập');
     return collection(db, 'users', currentUser.uid, 'attendance');
+}
+
+function getAttendanceSchedule(date) {
+    const schedule = attendanceSchedules?.[date];
+    if (!schedule || parseTime(schedule.checkInTime) === null || parseTime(schedule.checkOutTime) === null) return null;
+    return schedule;
 }
 
 function escapeHtml(value) {
@@ -629,19 +645,23 @@ function getEffectiveStatus(item) {
 
     const currentMinutes = getCurrentVietnamMinutes();
     const isPastDate = item.date < todayStr;
-    const missedCheckInDeadline = item.date === todayStr && missingCheckIn && currentMinutes > 12 * 60;
+    const schedule = getAttendanceSchedule(item.date);
+    const missedDeadline = schedule ? parseTime(schedule.checkOutTime) : 12 * 60;
+    const missedCheckInDeadline = item.date === todayStr && missingCheckIn && currentMinutes > missedDeadline;
     return isPastDate || missedCheckInDeadline ? 'Quên chấm công' : storedStatus || 'Không xác định';
 }
 
 async function syncExpiredAttendanceStatus() {
     const currentMinutes = getCurrentVietnamMinutes();
+    const todaySchedule = getAttendanceSchedule(todayStr);
     const todayRef = doc(getUserAttendanceCollection(), todayStr);
     const todaySnapshot = await getDoc(todayRef);
     const todayData = todaySnapshot.exists() ? todaySnapshot.data() : null;
     const hasLeaveStatus = todayData && typeof todayData.status === 'string' && todayData.status.includes('Nghỉ');
     const missingCheckIn = !todayData || !todayData.checkIn || todayData.checkIn === 'Chưa chấm';
-    const missedCheckInDeadline = missingCheckIn && currentMinutes > 12 * 60;
-    if (!hasLeaveStatus && missedCheckInDeadline) {
+    const missedDeadline = todaySchedule ? parseTime(todaySchedule.checkOutTime) : 12 * 60;
+    const missedCheckInDeadline = missingCheckIn && currentMinutes > missedDeadline;
+    if (!hasLeaveStatus && (!todayHoliday || todaySchedule) && missedCheckInDeadline) {
         await setDoc(todayRef, {
             date: todayStr,
             status: 'Quên chấm công',
@@ -674,22 +694,28 @@ function getEarlyLeaveText(diffMinutes) {
     return `${hours} giờ ${minutes} phút`;
 }
 
-function normalizeEarlyLeaveRecord(record) {
-    if (!record || typeof record.status !== 'string' || !record.status.startsWith('Về sớm')) {
+function normalizeEarlyLeaveRecord(record, schedules = attendanceSchedules) {
+    const originalStatus = String(record?.status || '');
+    if (!record || originalStatus.includes('Nghỉ')
+        || (!['Đi làm', 'Đi trễ'].includes(originalStatus) && !originalStatus.startsWith('Về sớm'))) {
         return { record, changed: false };
     }
 
+    const checkInMinutes = parseTime(record.checkIn);
     const checkOutMinutes = parseTime(record.checkOut);
-    if (checkOutMinutes === null) return { record, changed: false };
+    if (checkInMinutes === null || checkOutMinutes === null) return { record, changed: false };
 
-    const roundedCheckOut = roundCheckOutTime(checkOutMinutes);
-    const standardOutMinutes = 17 * 60;
-    const normalizedStatus = roundedCheckOut.minutes < standardOutMinutes
-        ? `Về sớm ${getEarlyLeaveText(standardOutMinutes - roundedCheckOut.minutes)}`
-        : 'Đi làm';
+    const shouldRoundCheckOut = originalStatus.startsWith('Về sớm');
+    const roundedCheckOut = shouldRoundCheckOut ? roundCheckOutTime(checkOutMinutes) : null;
+    const effectiveCheckOut = roundedCheckOut ? roundedCheckOut.minutes : checkOutMinutes;
+    const schedule = schedules?.[record.date];
+    const standardOutMinutes = schedule ? parseTime(schedule.checkOutTime) : (18 * 60) + 30;
+    const normalizedStatus = effectiveCheckOut < standardOutMinutes
+        ? `Về sớm ${getEarlyLeaveText(standardOutMinutes - effectiveCheckOut)}`
+        : originalStatus === 'Đi trễ' ? 'Đi trễ' : 'Đi làm';
     const normalizedRecord = {
         ...record,
-        checkOut: roundedCheckOut.text,
+        ...(roundedCheckOut ? { checkOut: roundedCheckOut.text } : {}),
         status: normalizedStatus
     };
     const changed = normalizedRecord.checkOut !== record.checkOut
@@ -773,7 +799,7 @@ window.updateButtonState = function () {
 
     updateTodayStatusCard();
 
-    if (todayHoliday) {
+    if (todayHoliday && !getAttendanceSchedule(todayStr)) {
         btn.disabled = true;
         btn.classList.remove('is-leave');
         btnText.textContent = `Nghỉ lễ: ${todayHoliday.name}`;
@@ -914,12 +940,36 @@ async function loadEmployees() {
             .filter(employee => employee.uid !== currentUser.uid)
             .sort((first, second) => String(first.displayName || first.email || '').localeCompare(String(second.displayName || second.email || ''), 'vi'));
         employeeAttendance = new Map();
+        const migrationBatches = [];
+        let migrationBatch = writeBatch(db);
+        let migrationCount = 0;
         await Promise.all(employees.map(async employee => {
             const attendanceSnapshot = await getDocs(collection(db, 'users', employee.uid, 'attendance'));
-            employeeAttendance.set(employee.uid, attendanceSnapshot.docs.map(record => record.data()));
+            const records = attendanceSnapshot.docs.map(recordSnapshot => {
+                const data = recordSnapshot.data();
+                const normalized = normalizeEarlyLeaveRecord(data, employee.attendanceSchedules || {});
+                if (normalized.changed) {
+                    migrationBatch.set(recordSnapshot.ref, {
+                        status: normalized.record.status,
+                        ...(normalized.record.checkOut !== data.checkOut ? { checkOut: normalized.record.checkOut } : {}),
+                        updatedAt: serverTimestamp()
+                    }, { merge: true });
+                    migrationCount += 1;
+                    if (migrationCount === 450) {
+                        migrationBatches.push(migrationBatch.commit());
+                        migrationBatch = writeBatch(db);
+                        migrationCount = 0;
+                    }
+                }
+                return normalized.record;
+            });
+            employeeAttendance.set(employee.uid, records);
         }));
+        if (migrationCount) migrationBatches.push(migrationBatch.commit());
+        if (migrationBatches.length) await Promise.all(migrationBatches);
         updateAdminSummary();
         renderEmployees();
+        updateOvertimeScheduleForm();
     } catch (error) {
         console.error(error);
         list.innerHTML = '<p style="color:var(--danger);">Không thể tải danh sách nhân viên. Hãy kiểm tra Firestore Rules.</p>';
@@ -1019,7 +1069,7 @@ async function viewEmployeeAttendance(uid) {
     const rows = records.length ? records.map(record => `
                 <tr>
                     <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;">${escapeHtml(record.date)}</td>
-                    <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(record.status || '')}</td>
+                    <td class="attendance-status-cell" style="padding:10px 8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(record.status || '')}</td>
                     <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;">${escapeHtml(record.checkIn || 'Chưa chấm')}</td>
                     <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;">${escapeHtml(record.checkOut || 'Chưa chấm')}</td>
                     <td style="padding:7px 4px;border-bottom:1px solid #e2e8f0;text-align:right;"><button type="button" class="btn-secondary admin-edit-attendance" data-date="${escapeHtml(record.date)}" style="width:auto;padding:7px 10px;font-size:12px;margin:0;">Sửa</button></td>
@@ -1027,7 +1077,7 @@ async function viewEmployeeAttendance(uid) {
             `).join('') : '<tr><td colspan="5">Không có dữ liệu trong tháng này.</td></tr>';
     await Swal.fire({
         title: escapeHtml(employee.displayName || employee.email || 'Nhân viên'),
-        html: `<div style="max-height:360px;overflow:auto;padding:0 4px;"><table class="attendance-view-table" style="width:100%;border-collapse:separate;border-spacing:0 3px;text-align:left;font-size:13px;"><thead><tr><th style="padding:4px 8px 7px;">Ngày</th><th style="padding:4px 8px 7px;">Trạng thái</th><th style="padding:4px 8px 7px;">Vào</th><th style="padding:4px 8px 7px;">Ra</th><th style="padding:4px 4px 7px;"></th></tr></thead><tbody>${rows}</tbody></table></div>`,
+        html: `<div class="attendance-view-scroll"><table class="attendance-view-table"><colgroup><col><col><col><col><col></colgroup><thead><tr><th>Ngày</th><th>Trạng thái</th><th>Vào</th><th>Ra</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`,
         confirmButtonText: 'Đóng',
         width: 720,
         customClass: { popup: 'attendance-view-popup' },
@@ -1259,7 +1309,7 @@ function calculatePayroll(employee, month, adjustments = {}) {
         const netMinutes = Math.max(0, elapsedMinutes - config.breakMinutes);
         totalWorkMinutes += netMinutes;
         workDayEquivalent += Math.min(netMinutes, standardMinutes) / standardMinutes;
-        const scheduledEnd = (8 * 60) + standardMinutes + config.breakMinutes;
+        const scheduledEnd = parseTime(employee.attendanceSchedules?.[record.date]?.checkOutTime) ?? (18 * 60) + 30;
         if (checkOut < scheduledEnd) {
             earlyLeaveMinutes += scheduledEnd - checkOut;
         }
@@ -1468,6 +1518,114 @@ document.getElementById('adminMonth').addEventListener('change', () => {
 });
 document.getElementById('adminStatusFilter').addEventListener('change', renderEmployees);
 
+function updateOvertimeScheduleForm() {
+    const date = document.getElementById('overtimeScheduleDate').value;
+    const schedules = employees.map(employee => employee.attendanceSchedules?.[date]).filter(Boolean);
+    const status = document.getElementById('overtimeScheduleStatus');
+    const checkInInput = document.getElementById('overtimeScheduleCheckIn');
+    const checkOutInput = document.getElementById('overtimeScheduleCheckOut');
+    const clearButton = document.getElementById('clearOvertimeScheduleBtn');
+    const uniqueSchedules = new Map(schedules.map(schedule => [
+        `${schedule.checkInTime}|${schedule.checkOutTime}`,
+        schedule
+    ]));
+
+    if (uniqueSchedules.size === 1) {
+        const schedule = [...uniqueSchedules.values()][0];
+        checkInInput.value = schedule.checkInTime;
+        checkOutInput.value = schedule.checkOutTime;
+        status.textContent = `Đã có lịch ${schedule.checkInTime}–${schedule.checkOutTime} cho ${schedules.length} nhân viên.`;
+        clearButton.disabled = false;
+    } else if (uniqueSchedules.size > 1) {
+        checkInInput.value = '';
+        checkOutInput.value = '';
+        status.textContent = 'Lịch ngày này đang khác nhau giữa các nhân viên. Nhập giờ mới để đồng bộ.';
+        clearButton.disabled = false;
+    } else {
+        checkInInput.value = '08:00';
+        checkOutInput.value = '18:30';
+        status.textContent = 'Chưa thiết lập lịch riêng cho ngày này.';
+        clearButton.disabled = true;
+    }
+}
+
+async function saveOvertimeSchedule(clearSchedule = false) {
+    const date = document.getElementById('overtimeScheduleDate').value;
+    const checkInTime = document.getElementById('overtimeScheduleCheckIn').value;
+    const checkOutTime = document.getElementById('overtimeScheduleCheckOut').value;
+    const button = document.getElementById(clearSchedule ? 'clearOvertimeScheduleBtn' : 'saveOvertimeScheduleBtn');
+    if (!date) {
+        Swal.fire('Thiếu ngày', 'Vui lòng chọn ngày áp dụng lịch.', 'warning');
+        return;
+    }
+    if (!clearSchedule && (parseTime(checkInTime) === null || parseTime(checkOutTime) === null
+        || parseTime(checkInTime) >= parseTime(checkOutTime))) {
+        Swal.fire('Giờ chưa hợp lệ', 'Giờ vào phải sớm hơn giờ ra trong cùng ngày.', 'warning');
+        return;
+    }
+    if (!employees.length) {
+        Swal.fire('Chưa có nhân viên', 'Không có hồ sơ nhân viên để áp dụng lịch.', 'info');
+        return;
+    }
+
+    button.disabled = true;
+    try {
+        const batches = [];
+        let batch = writeBatch(db);
+        let batchSize = 0;
+        employees.forEach(employee => {
+            const schedules = { ...(employee.attendanceSchedules || {}) };
+            if (clearSchedule) delete schedules[date];
+            else schedules[date] = { checkInTime, checkOutTime };
+            batch.set(doc(db, 'users', employee.uid), {
+                attendanceSchedules: schedules,
+                updatedAt: serverTimestamp(),
+                updatedBy: currentUser.uid
+            }, { merge: true });
+            batchSize += 1;
+            if (batchSize === 450) {
+                batches.push(batch.commit());
+                batch = writeBatch(db);
+                batchSize = 0;
+            }
+        });
+        if (batchSize) batches.push(batch.commit());
+        await Promise.all(batches);
+        await setDoc(doc(db, 'auditLogs', `${Date.now()}-${currentUser.uid}`), {
+            action: clearSchedule ? 'DELETE_ATTENDANCE_SCHEDULE' : 'UPDATE_ATTENDANCE_SCHEDULE',
+            date,
+            schedule: clearSchedule ? null : { checkInTime, checkOutTime },
+            affectedEmployees: employees.length,
+            updatedBy: currentUser.uid,
+            updatedAt: serverTimestamp()
+        });
+        employees = employees.map(employee => {
+            const schedules = { ...(employee.attendanceSchedules || {}) };
+            if (clearSchedule) delete schedules[date];
+            else schedules[date] = { checkInTime, checkOutTime };
+            return { ...employee, attendanceSchedules: schedules };
+        });
+        updateOvertimeScheduleForm();
+        Swal.fire({
+            icon: 'success',
+            title: clearSchedule ? 'Đã xóa lịch tăng ca' : 'Đã áp dụng lịch tăng ca',
+            text: `${date}: ${clearSchedule ? 'đã trở về giờ chấm công mặc định' : `${checkInTime}–${checkOutTime}`} · ${employees.length} nhân viên`,
+            timer: 1900,
+            showConfirmButton: false
+        });
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Lỗi', 'Không thể lưu lịch. Hãy kiểm tra Firestore Rules.', 'error');
+    } finally {
+        button.disabled = false;
+    }
+}
+
+document.getElementById('overtimeScheduleDate').value = todayStr;
+document.getElementById('overtimeScheduleDate').addEventListener('change', updateOvertimeScheduleForm);
+document.getElementById('saveOvertimeScheduleBtn').addEventListener('click', () => saveOvertimeSchedule());
+document.getElementById('clearOvertimeScheduleBtn').addEventListener('click', () => saveOvertimeSchedule(true));
+
 window.saveAttendance = async function () {
     const date = dateInput.value;
     let status = document.getElementById('status').value;
@@ -1481,7 +1639,8 @@ window.saveAttendance = async function () {
         return;
     }
 
-    if (todayHoliday) {
+    const todaySchedule = getAttendanceSchedule(date);
+    if (todayHoliday && !todaySchedule) {
         Swal.fire({
             icon: 'info',
             title: 'Hôm nay được nghỉ lễ',
@@ -1509,7 +1668,7 @@ window.saveAttendance = async function () {
     // Kiểm tra trạng thái nếu hôm nay đã tồn tại bản ghi
     if (todayExistingRecord) {
         const existingStatus = typeof todayExistingRecord.status === 'string' ? todayExistingRecord.status : '';
-        
+
         // Nếu đã chấm nghỉ nhưng chuyển sang "Đi làm", cho phép đổi lại
         if (existingStatus.includes('Nghỉ') && !isLeaveStatus) {
             Swal.fire('Thông báo', 'Bạn đã chấm nghỉ hôm nay. Vui lòng xóa record rồi chấm lại.', 'warning');
@@ -1551,34 +1710,40 @@ window.saveAttendance = async function () {
         // Logic đi làm chia làm 2 lần rõ rệt (Lần 1: Vào, Lần 2: Ra)
         if (!todayExistingRecord) {
             // --- LẦN 1: CHẤM CÔNG VÀO ---
-            if (totalCurrentMinutes < 6 * 60) {
+            const expectedCheckIn = todaySchedule ? parseTime(todaySchedule.checkInTime) : 8 * 60;
+            const latestCheckIn = todaySchedule ? parseTime(todaySchedule.checkOutTime) : 12 * 60;
+            const earliestCheckIn = todaySchedule ? Math.max(0, expectedCheckIn - 60) : 6 * 60;
+            if (totalCurrentMinutes < earliestCheckIn) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Chưa đến giờ chấm công vào!',
-                    text: 'Chỉ được chấm công vào từ 06:00 sáng.',
+                    text: todaySchedule
+                        ? `Có thể chấm vào từ ${String(Math.floor(earliestCheckIn / 60)).padStart(2, '0')}:${String(earliestCheckIn % 60).padStart(2, '0')}.`
+                        : 'Chỉ được chấm công vào từ 06:00 sáng.',
                     confirmButtonColor: '#f59e0b'
                 });
                 return;
-            } else if (totalCurrentMinutes <= 8 * 60) {
+            } else if (totalCurrentMinutes <= latestCheckIn) {
                 calculatedCheckIn = currentTime;
-                finalStatus = "Đi làm";
-            } else if (totalCurrentMinutes <= 12 * 60) {
-                calculatedCheckIn = currentTime;
-                finalStatus = "Đi trễ";
+                finalStatus = totalCurrentMinutes > expectedCheckIn ? 'Đi trễ' : 'Đi làm';
             } else {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Đã quá giờ chấm công vào!',
-                    text: 'Chấm công vào chỉ được thực hiện trước hoặc lúc 12:00.',
+                    text: todaySchedule
+                        ? `Không thể chấm vào sau giờ ra dự kiến ${todaySchedule.checkOutTime}.`
+                        : 'Chấm công vào chỉ được thực hiện trước hoặc lúc 12:00.',
                     confirmButtonColor: '#f59e0b'
                 });
                 return;
             }
         } else {
             // --- LẦN 2: CHẤM CÔNG RA ---
-            if (totalCurrentMinutes >= 12 * 60) {
+            const earliestCheckOut = todaySchedule ? parseTime(todaySchedule.checkInTime) : 12 * 60;
+            const actualCheckIn = parseTime(todayExistingRecord.checkIn);
+            if (totalCurrentMinutes >= earliestCheckOut && totalCurrentMinutes > actualCheckIn) {
                 const roundedCheckOut = roundCheckOutTime(totalCurrentMinutes);
-                const standardOutMinutes = 17 * 60;
+                const standardOutMinutes = todaySchedule ? parseTime(todaySchedule.checkOutTime) : (18 * 60) + 30;
                 calculatedCheckOut = roundedCheckOut.text;
                 if (roundedCheckOut.minutes < standardOutMinutes) {
                     const diffMinutes = standardOutMinutes - roundedCheckOut.minutes;
@@ -1590,7 +1755,9 @@ window.saveAttendance = async function () {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Chưa tới giờ chấm công ra!',
-                    text: 'Chỉ được phép chấm công ra từ 12:00 trưa.',
+                    text: todaySchedule
+                        ? `Chỉ có thể chấm ra sau giờ vào dự kiến ${todaySchedule.checkInTime}.`
+                        : 'Chỉ được phép chấm công ra từ 12:00 trưa.',
                     confirmButtonColor: '#f59e0b'
                 });
                 return;
@@ -1879,20 +2046,20 @@ window.resetTodayRecord = async function () {
                 showPageLoader('Xóa record hôm nay...');
                 const todayDocRef = doc(getUserAttendanceCollection(), todayStr);
                 await deleteDoc(todayDocRef);
-                
+
                 // Reset dữ liệu và UI
                 todayExistingRecord = null;
                 globalAttendanceData = globalAttendanceData.filter(item => item.date !== todayStr);
-                
+
                 // Reset status dropdown về "Đi làm"
                 document.getElementById('status').value = 'Đi làm';
-                
+
                 // Ẩn nút xóa và update
                 const resetBtn = document.getElementById('resetTodayBtn');
                 if (resetBtn) {
                     resetBtn.classList.add('hidden');
                 }
-                
+
                 // Enable lại nút save
                 updateButtonState();
 
@@ -1961,7 +2128,7 @@ function getAvailableMonths() {
 
 window.confirmClearData = function () {
     const availableMonths = getAvailableMonths();
-    
+
     if (availableMonths.length === 0) {
         Swal.fire('Không có dữ liệu', 'Không có dữ liệu nào để xóa.', 'info');
         return;
@@ -2006,7 +2173,7 @@ window.confirmClearData = function () {
                 const batches = [];
                 let batch = writeBatch(db);
                 let deleteCount = 0;
-                
+
                 querySnapshot.docs.forEach((record, index) => {
                     const recordData = record.data();
                     if (recordData.date && recordData.date.startsWith(selectedMonth)) {
@@ -2018,13 +2185,13 @@ window.confirmClearData = function () {
                         }
                     }
                 });
-                
+
                 if (deleteCount % 450 !== 0 && deleteCount > 0) batches.push(batch.commit());
                 if (batches.length > 0) await Promise.all(batches);
 
                 const monthName = new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric' })
                     .format(new Date(selectedMonth.split('-')[0], parseInt(selectedMonth.split('-')[1]) - 1));
-                
+
                 Swal.fire('Đã xóa!', `Dữ liệu tháng ${monthName} đã được xóa (${deleteCount} ngày).`, 'success');
                 await loadAttendance();
             } catch (e) {
@@ -2065,6 +2232,7 @@ onAuthStateChanged(auth, async (user) => {
         document.getElementById('appTitle').textContent = isAdmin ? 'Bảng quản lý nhân viên' : 'Sổ chấm công cá nhân';
         const profileSnapshot = await getDoc(doc(db, 'users', user.uid));
         const profile = profileSnapshot.exists() ? profileSnapshot.data() : {};
+        attendanceSchedules = profile.attendanceSchedules || {};
         const displayName = profile.displayName || user.displayName || user.email || 'Người dùng';
         const displayNameInput = document.getElementById('displayNameInput');
         if (displayNameInput) displayNameInput.value = profile.displayName || user.displayName || '';
@@ -2086,4 +2254,60 @@ onAuthStateChanged(auth, async (user) => {
     } finally {
         hidePageLoader();
     }
-});
+    /**
+ * Khởi tạo tính năng xem ảnh dạng Modal
+ */
+    function initImageViewer() {
+        // Tạo sẵn các phần tử tham chiếu
+        const modal = document.getElementById('imageViewerModal');
+        const modalImg = document.getElementById('modalFullImage');
+        const captionText = document.getElementById('modalImageCaption');
+        const closeBtn = document.getElementById('closeImageViewer');
+
+        if (!modal) return;
+
+        // Lắng nghe sự kiện click trên toàn bộ document (áp dụng cho cả các ảnh được render động sau này)
+        document.addEventListener('click', function (event) {
+            // Kiểm tra nếu phần tử được click có class hoặc attribute là 'zoomable-img' hoặc nằm trong khung xem ảnh
+            if (event.target.classList.contains('zoomable-img') || event.target.tagName === 'IMG' && event.target.closest('.image-preview-container')) {
+                modal.style.display = 'flex';
+                setTimeout(() => modal.style.opacity = '1', 10); // Hiệu ứng fade-in
+                modalImg.src = event.target.src;
+                captionText.innerHTML = event.target.alt || '';
+            }
+        });
+
+        // Đóng modal khi bấm nút X
+        function closeModal() {
+            modal.style.opacity = '0';
+            setTimeout(() => {
+                modal.style.display = 'none';
+                modalImg.src = '';
+            }, 300);
+        }
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeModal);
+        }
+
+        // Đóng modal khi click ra vùng nền tối bên ngoài ảnh
+        modal.addEventListener('click', function (event) {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+
+        // Đóng modal khi bấm phím ESC trên bàn phím
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && modal.style.display === 'flex') {
+                closeModal();
+            }
+        });
+    }
+
+    // Gọi hàm khởi tạo khi DOM đã load xong
+    document.addEventListener('DOMContentLoaded', () => {
+        initImageViewer();
+    });
+}
+);

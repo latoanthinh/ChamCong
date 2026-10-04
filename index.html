@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,13 +10,16 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Grotesk:wght@500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div id="pageLoader" class="page-loader" role="status" aria-live="polite" aria-label="Đang tải">
         <div class="loader-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-        <strong id="pageLoaderText">Đang chuẩn bị dữ liệu...</strong>
+        <strong id="pageLoaderText">Đang load chờ xíu...</strong>
         <span>Vui lòng chờ trong giây lát</span>
     </div>
 
@@ -28,7 +32,8 @@
             <div class="auth-intro">
                 <span class="eyebrow">SỔ CHẤM CÔNG NỘI BỘ</span>
                 <h1>Một ngày làm việc rõ ràng bắt đầu từ một lần chấm công đúng lúc.</h1>
-                <p>Theo dõi giờ vào, giờ ra và ngày nghỉ trong một không gian gọn gàng cho cả nhân viên lẫn quản trị viên.</p>
+                <p>Theo dõi giờ vào, giờ ra và ngày nghỉ trong một không gian gọn gàng cho cả nhân viên lẫn quản trị
+                    viên.</p>
                 <ul class="auth-highlights">
                     <li>Chấm công 2 lần: vào sáng / ra chiều</li>
                     <li>Lịch âm dương & ngày lễ Việt Nam</li>
@@ -52,7 +57,8 @@
             </div>
             <div class="login-mode" role="tablist" aria-label="Loại tài khoản">
                 <span class="login-mode-indicator" aria-hidden="true"></span>
-                <button id="employeeLoginMode" type="button" class="active" role="tab" aria-selected="true">Nhân viên</button>
+                <button id="employeeLoginMode" type="button" class="active" role="tab" aria-selected="true">Nhân
+                    viên</button>
                 <button id="adminLoginMode" type="button" role="tab" aria-selected="false">Quản trị viên</button>
             </div>
             <form id="loginForm">
@@ -63,8 +69,10 @@
                 <div class="form-group">
                     <label for="loginPassword">Mật khẩu</label>
                     <div class="password-field">
-                        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu" required>
-                        <button id="togglePasswordBtn" type="button" class="password-toggle" aria-label="Hiện mật khẩu" title="Hiện/ẩn mật khẩu">👁</button>
+                        <input id="loginPassword" type="password" autocomplete="current-password"
+                            placeholder="Nhập mật khẩu" required>
+                        <button id="togglePasswordBtn" type="button" class="password-toggle" aria-label="Hiện mật khẩu"
+                            title="Hiện/ẩn mật khẩu">👁</button>
                     </div>
                 </div>
                 <label class="remember-login">
@@ -96,7 +104,8 @@
                         <span id="liveClockDate">Đang cập nhật...</span>
                     </div>
                 </div>
-                <button id="darkModeBtn" type="button" class="icon-btn" title="Đổi giao diện" aria-label="Đổi giao diện">◐</button>
+                <button id="darkModeBtn" type="button" class="icon-btn" title="Đổi giao diện"
+                    aria-label="Đổi giao diện">◐</button>
                 <button id="logoutBtn" type="button" class="btn-ghost">Đăng xuất</button>
             </div>
         </header>
@@ -149,6 +158,32 @@
                     <span>Đang nghỉ</span>
                 </div>
             </div>
+            <section class="overtime-schedule" aria-labelledby="overtimeScheduleTitle">
+                <div>
+                    <span class="eyebrow">ĐIỀU CHỈNH CA</span>
+                    <h3 id="overtimeScheduleTitle">Lịch chấm công tăng ca</h3>
+                    <p>Áp dụng giờ vào/ra riêng cho toàn bộ nhân viên trong ngày đã chọn.</p>
+                </div>
+                <div class="overtime-schedule-fields">
+                    <label>
+                        <span>Ngày áp dụng</span>
+                        <input id="overtimeScheduleDate" type="date">
+                    </label>
+                    <label>
+                        <span>Giờ vào dự kiến</span>
+                        <input id="overtimeScheduleCheckIn" type="time" value="08:00">
+                    </label>
+                    <label>
+                        <span>Giờ ra dự kiến</span>
+                        <input id="overtimeScheduleCheckOut" type="time" value="18:30">
+                    </label>
+                </div>
+                <div class="overtime-schedule-actions">
+                    <span id="overtimeScheduleStatus" role="status" aria-live="polite"></span>
+                    <button id="clearOvertimeScheduleBtn" type="button" class="btn-outline">Xóa lịch ngày này</button>
+                    <button id="saveOvertimeScheduleBtn" type="button" class="btn-primary">Áp dụng lịch</button>
+                </div>
+            </section>
             <div class="admin-dashboard">
                 <div class="admin-dashboard-heading">
                     <div>
@@ -166,8 +201,10 @@
                             </div>
                             <span id="attendanceRateLabel" class="insight-value">0%</span>
                         </div>
-                        <div id="attendanceChart" class="attendance-chart" aria-label="Biểu đồ lượt chấm công theo ngày"></div>
-                        <div class="chart-axis"><span>Đầu tháng</span><span>Giữa tháng</span><span>Cuối tháng</span></div>
+                        <div id="attendanceChart" class="attendance-chart"
+                            aria-label="Biểu đồ lượt chấm công theo ngày"></div>
+                        <div class="chart-axis"><span>Đầu tháng</span><span>Giữa tháng</span><span>Cuối tháng</span>
+                        </div>
                     </article>
                     <article class="insight-card status-insight-card">
                         <div class="insight-card-heading">
@@ -177,7 +214,8 @@
                             </div>
                         </div>
                         <div class="status-chart-wrap">
-                            <div id="statusDonut" class="status-donut"><span id="statusDonutTotal">0</span><small>bản ghi</small></div>
+                            <div id="statusDonut" class="status-donut"><span id="statusDonutTotal">0</span><small>bản
+                                    ghi</small></div>
                             <div id="statusLegend" class="status-legend"></div>
                         </div>
                     </article>
@@ -216,7 +254,8 @@
                     <option value="Quên chấm công">Quên chấm công</option>
                     <option value="Thiếu giờ">Thiếu giờ</option>
                 </select>
-                <input id="employeeSearch" type="search" placeholder="Tìm tên hoặc email nhân viên" aria-label="Tìm nhân viên">
+                <input id="employeeSearch" type="search" placeholder="Tìm tên hoặc email nhân viên"
+                    aria-label="Tìm nhân viên">
             </div>
             <div id="employeeList" class="employee-list" aria-busy="true"></div>
         </section>
@@ -252,6 +291,7 @@
                         </div>
                     </div>
                 </div>
+                <p id="todayScheduleNote" class="today-schedule-note hidden"></p>
 
                 <div class="card action-card">
                     <div class="card-heading">
@@ -264,7 +304,8 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="displayNameInput">Tên hiển thị</label>
-                            <input id="displayNameInput" type="text" maxlength="80" autocomplete="name" placeholder="Nhập tên của bạn">
+                            <input id="displayNameInput" type="text" maxlength="80" autocomplete="name"
+                                placeholder="Nhập tên của bạn">
                         </div>
                         <div class="form-group">
                             <label for="date">Ngày chấm công</label>
@@ -321,7 +362,8 @@
                 <div class="quick-actions">
                     <button type="button" class="btn-secondary" data-action="report">▣ Thống kê & in</button>
                     <button type="button" class="btn-secondary" data-action="reminders">◷ Nhắc chấm công</button>
-                    <button type="button" class="btn-danger-outline" data-action="clear-data">Xóa dữ liệu của tôi</button>
+                    <button type="button" class="btn-danger-outline" data-action="clear-data">Xóa dữ liệu của
+                        tôi</button>
                 </div>
             </section>
 
@@ -335,9 +377,11 @@
                         <button id="calendarTodayBtn" type="button" class="btn-text">Hôm nay</button>
                     </div>
                     <div class="calendar-toolbar">
-                        <button id="calendarPrevBtn" class="calendar-nav-btn" type="button" aria-label="Tháng trước">←</button>
+                        <button id="calendarPrevBtn" class="calendar-nav-btn" type="button"
+                            aria-label="Tháng trước">←</button>
                         <strong id="calendarMonthLabel"></strong>
-                        <button id="calendarNextBtn" class="calendar-nav-btn" type="button" aria-label="Tháng sau">→</button>
+                        <button id="calendarNextBtn" class="calendar-nav-btn" type="button"
+                            aria-label="Tháng sau">→</button>
                     </div>
                     <div class="calendar-weekdays" aria-hidden="true">
                         <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
@@ -410,25 +454,105 @@
             <h2 id="payroll-print-month"></h2>
         </header>
         <table class="payroll-print-table payroll-print-profile">
-            <tr><th>Họ và tên</th><td id="payroll-print-name"></td><th>Phòng ban/Bộ phận</th><td id="payroll-print-department"></td></tr>
-            <tr><th>Tổng lương</th><td id="payroll-print-total-salary"></td><th>Phụ cấp</th><td id="payroll-print-allowance"></td></tr>
-            <tr><th>Lương BHXH</th><td id="payroll-print-insurance-salary"></td><th>Thực nhận</th><td id="payroll-print-net" class="payroll-print-highlight"></td></tr>
+            <tr>
+                <th>Họ và tên</th>
+                <td id="payroll-print-name"></td>
+                <th>Phòng ban/Bộ phận</th>
+                <td id="payroll-print-department"></td>
+            </tr>
+            <tr>
+                <th>Tổng lương</th>
+                <td id="payroll-print-total-salary"></td>
+                <th>Phụ cấp</th>
+                <td id="payroll-print-allowance"></td>
+            </tr>
+            <tr>
+                <th>Lương BHXH</th>
+                <td id="payroll-print-insurance-salary"></td>
+                <th>Thực nhận</th>
+                <td id="payroll-print-net" class="payroll-print-highlight"></td>
+            </tr>
         </table>
         <table class="payroll-print-table">
-            <thead><tr><th colspan="2">I. Chấm công</th><th colspan="2">II. Các khoản phải trả NLĐ</th><th colspan="2">III. Các khoản phải thu NLĐ</th></tr></thead>
+            <thead>
+                <tr>
+                    <th colspan="2">I. Chấm công</th>
+                    <th colspan="2">II. Các khoản phải trả NLĐ</th>
+                    <th colspan="2">III. Các khoản phải thu NLĐ</th>
+                </tr>
+            </thead>
             <tbody>
-                <tr><th>Ngày công</th><td id="payroll-print-work-days"></td><th>Lương ngày công</th><td id="payroll-print-work-pay"></td><th>Nộp BHXH</th><td id="payroll-print-insurance"></td></tr>
-                <tr><th>Giờ tăng ca</th><td id="payroll-print-overtime-hours"></td><th>Lương tăng ca</th><td id="payroll-print-overtime-pay"></td><th>Ứng lương</th><td id="payroll-print-advance"></td></tr>
-                <tr><th>Nghỉ phép có lương</th><td id="payroll-print-leave-days"></td><th>Tổng tiền phép có lương</th><td id="payroll-print-leave-pay"></td><th>Quên chấm công</th><td id="payroll-print-forgotten"></td></tr>
-                <tr><th>Nghỉ vượt phép</th><td id="payroll-print-unpaid-leave-days"></td><th>Khấu trừ về sớm</th><td id="payroll-print-early-leave"></td><th>Đi trễ</th><td id="payroll-print-late"></td></tr>
-                <tr><th>Phụ cấp</th><td id="payroll-print-allowance"></td><th>Thưởng</th><td id="payroll-print-bonus"></td><th></th><td></td></tr>
-                <tr><th></th><td></td><th>Tổng thu nhập</th><td id="payroll-print-gross"></td><th>Thuế TNCN</th><td id="payroll-print-tax"></td></tr>
-                <tr><th colspan="4"></th><th>Khấu trừ khác</th><td id="payroll-print-other"></td></tr>
+                <tr>
+                    <th>Ngày công</th>
+                    <td id="payroll-print-work-days"></td>
+                    <th>Lương ngày công</th>
+                    <td id="payroll-print-work-pay"></td>
+                    <th>Nộp BHXH</th>
+                    <td id="payroll-print-insurance"></td>
+                </tr>
+                <tr>
+                    <th>Giờ tăng ca</th>
+                    <td id="payroll-print-overtime-hours"></td>
+                    <th>Lương tăng ca</th>
+                    <td id="payroll-print-overtime-pay"></td>
+                    <th>Ứng lương</th>
+                    <td id="payroll-print-advance"></td>
+                </tr>
+                <tr>
+                    <th>Nghỉ phép có lương</th>
+                    <td id="payroll-print-leave-days"></td>
+                    <th>Tổng tiền phép có lương</th>
+                    <td id="payroll-print-leave-pay"></td>
+                    <th>Quên chấm công</th>
+                    <td id="payroll-print-forgotten"></td>
+                </tr>
+                <tr>
+                    <th>Nghỉ vượt phép</th>
+                    <td id="payroll-print-unpaid-leave-days"></td>
+                    <th>Khấu trừ về sớm</th>
+                    <td id="payroll-print-early-leave"></td>
+                    <th>Đi trễ</th>
+                    <td id="payroll-print-late"></td>
+                </tr>
+                <tr>
+                    <th>Phụ cấp</th>
+                    <td id="payroll-print-allowance"></td>
+                    <th>Thưởng</th>
+                    <td id="payroll-print-bonus"></td>
+                    <th></th>
+                    <td></td>
+                </tr>
+                <tr>
+                    <th></th>
+                    <td></td>
+                    <th>Tổng thu nhập</th>
+                    <td id="payroll-print-gross"></td>
+                    <th>Thuế TNCN</th>
+                    <td id="payroll-print-tax"></td>
+                </tr>
+                <tr>
+                    <th colspan="4"></th>
+                    <th>Khấu trừ khác</th>
+                    <td id="payroll-print-other"></td>
+                </tr>
             </tbody>
         </table>
         <p class="payroll-print-footer">Phiếu lương được lập từ dữ liệu chấm công đã được quản trị viên phê duyệt.</p>
     </div>
 
+    <!-- Modal Xem Ảnh Chung -->
+    <div id="imageViewerModal" class="modal-overlay"
+        style="display: none; position: fixed; z-index: 9999; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.85); align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease;">
+        <div class="modal-content-wrapper"
+            style="position: relative; max-width: 90%; max-height: 90%; text-align: center;">
+            <span id="closeImageViewer"
+                style="position: absolute; top: -40px; right: 0; color: #fff; font-size: 35px; font-weight: bold; cursor: pointer; transition: color 0.2s;">&times;</span>
+            <img id="modalFullImage" src="" alt="Expanded View"
+                style="max-width: 100%; max-height: 85vh; border-radius: 8px; box-shadow: 0 5px 25px rgba(0,0,0,0.5); object-fit: contain;">
+            <div id="modalImageCaption" style="color: #ccc; margin-top: 10px; font-size: 14px;"></div>
+        </div>
+    </div>
     <script type="module" src="script.js"></script>
 </body>
+
 </html>
