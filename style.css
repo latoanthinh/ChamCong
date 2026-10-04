@@ -1304,6 +1304,12 @@ input[readonly] {
     margin-bottom: 20px;
 }
 
+.admin-heading-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
 .admin-summary {
     display: grid;
     grid-template-columns: repeat(6, 1fr);

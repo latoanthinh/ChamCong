@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, collection, getDocs, getDoc, setDoc, doc, query, orderBy, writeBatch, serverTimestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, deleteUser, signOut, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCj1poSyx9DNXgeA27BP4-M-F1KV5ETFRI",
@@ -15,6 +16,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+const functions = getFunctions(app);
+const accountCreationApp = initializeApp(firebaseConfig, 'employee-account-creation');
+const accountCreationAuth = getAuth(accountCreationApp);
 const authScreen = document.getElementById('authScreen');
 const appScreen = document.getElementById('appScreen');
 const loginForm = document.getElementById('loginForm');
@@ -215,18 +219,11 @@ function updateTodayStatusCard() {
 
     card.classList.remove('is-work', 'is-leave', 'is-late', 'is-partial', 'is-done');
 
-    if (todayHoliday && !todaySchedule) {
-        label.textContent = `Nghỉ lễ: ${todayHoliday.name}`;
-        hint.textContent = 'Hôm nay là ngày nghỉ theo quy định. Không cần chấm công.';
-        checkInLabel.textContent = '—';
-        checkOutLabel.textContent = '—';
-        card.classList.add('is-leave');
-        return;
-    }
-
     if (!todayExistingRecord) {
-        label.textContent = 'Chưa chấm công';
-        hint.textContent = 'Hãy ghi nhận giờ vào khi bắt đầu ca làm.';
+        label.textContent = todayHoliday ? `Ngày lễ: ${todayHoliday.name}` : 'Chưa chấm công';
+        hint.textContent = todayHoliday
+            ? 'Hôm nay bạn có thể chọn đi làm hoặc chọn trạng thái nghỉ rồi ghi nhận.'
+            : 'Hãy ghi nhận giờ vào khi bắt đầu ca làm.';
         checkInLabel.textContent = '--:--';
         checkOutLabel.textContent = '--:--';
         return;
@@ -647,7 +644,7 @@ function getEffectiveStatus(item) {
     const isPastDate = item.date < todayStr;
     const schedule = getAttendanceSchedule(item.date);
     const missedDeadline = schedule ? parseTime(schedule.checkOutTime) : 12 * 60;
-    const missedCheckInDeadline = item.date === todayStr && missingCheckIn && currentMinutes > missedDeadline;
+    const missedCheckInDeadline = !todayHoliday && item.date === todayStr && missingCheckIn && currentMinutes > missedDeadline;
     return isPastDate || missedCheckInDeadline ? 'Quên chấm công' : storedStatus || 'Không xác định';
 }
 
@@ -661,7 +658,7 @@ async function syncExpiredAttendanceStatus() {
     const missingCheckIn = !todayData || !todayData.checkIn || todayData.checkIn === 'Chưa chấm';
     const missedDeadline = todaySchedule ? parseTime(todaySchedule.checkOutTime) : 12 * 60;
     const missedCheckInDeadline = missingCheckIn && currentMinutes > missedDeadline;
-    if (!hasLeaveStatus && (!todayHoliday || todaySchedule) && missedCheckInDeadline) {
+    if (!hasLeaveStatus && !todayHoliday && missedCheckInDeadline) {
         await setDoc(todayRef, {
             date: todayStr,
             status: 'Quên chấm công',
@@ -774,6 +771,15 @@ function renderAttendanceList() {
     }).join('');
 }
 
+function openPrintDialog() {
+    Swal.close();
+    window.setTimeout(() => {
+        window.print();
+        Swal.close();
+        window.focus();
+    }, 250);
+}
+
 document.getElementById('reportMonth').addEventListener('change', () => {
     renderAttendanceList();
     updateMonthStats();
@@ -787,7 +793,7 @@ window.printOldMonthReport = function () {
         return;
     }
     preparePrintData();
-    window.print();
+    openPrintDialog();
 };
 
 document.getElementById('printOldMonthBtn').addEventListener('click', printOldMonthReport);
@@ -798,13 +804,6 @@ window.updateButtonState = function () {
     const btnText = document.getElementById('btnText');
 
     updateTodayStatusCard();
-
-    if (todayHoliday && !getAttendanceSchedule(todayStr)) {
-        btn.disabled = true;
-        btn.classList.remove('is-leave');
-        btnText.textContent = `Nghỉ lễ: ${todayHoliday.name}`;
-        return;
-    }
 
     // Kiểm tra xem hôm nay đã hoàn tất thao tác chưa để khóa nút
     if (todayExistingRecord) {
@@ -911,6 +910,7 @@ function renderEmployees() {
                         <button type="button" class="btn-secondary" data-view-payroll="${escapeHtml(employee.uid)}">Tính lương</button>
                         <button type="button" class="btn-secondary" data-edit-employee="${escapeHtml(employee.uid)}">Sửa</button>
                         <button type="button" class="${employee.active === false ? 'btn-secondary' : 'btn-danger'}" data-toggle-employee="${escapeHtml(employee.uid)}">${employee.active === false ? 'Mở khóa' : 'Khóa'}</button>
+                        <button type="button" class="btn-danger" data-delete-employee="${escapeHtml(employee.uid)}">Xóa</button>
                     </div>
                 </div>
             `).join('');
@@ -926,6 +926,9 @@ function renderEmployees() {
     });
     list.querySelectorAll('[data-toggle-employee]').forEach(button => {
         button.addEventListener('click', () => toggleEmployee(button.dataset.toggleEmployee));
+    });
+    list.querySelectorAll('[data-delete-employee]').forEach(button => {
+        button.addEventListener('click', () => deleteEmployee(button.dataset.deleteEmployee));
     });
 }
 
@@ -1158,9 +1161,7 @@ async function editEmployee(uid) {
         html: `
             <input id="employeeDisplayName" class="swal2-input" value="${escapeHtml(employee.displayName || '')}" placeholder="Tên hiển thị">
             <input id="employeeDepartment" class="swal2-input" value="${escapeHtml(employee.department || '')}" placeholder="Phòng ban / Bộ phận">
-            <select id="employeeRole" class="swal2-select">
-                ${['Nhân viên', 'Quản trị viên', 'Super Admin'].map(role => `<option value="${role}" ${String(employee.role || 'Nhân viên') === role ? 'selected' : ''}>${role}</option>`).join('')}
-            </select>
+            <input id="employeeRole" class="swal2-input" maxlength="80" value="${escapeHtml(employee.role || 'Nhân viên')}" placeholder="Chức vụ">
             <div class="admin-payroll-form">
                 <strong>Thiết lập tính lương</strong>
                 <div class="admin-payroll-grid">
@@ -1179,8 +1180,13 @@ async function editEmployee(uid) {
         didOpen: () => bindNumberFormatting(['employeeTotalSalary', 'employeeInsuranceSalary', 'employeeAllowance']),
         preConfirm: () => {
             const displayName = document.getElementById('employeeDisplayName').value.trim();
+            const role = document.getElementById('employeeRole').value.trim();
             if (!displayName) {
                 Swal.showValidationMessage('Vui lòng nhập tên nhân viên.');
+                return undefined;
+            }
+            if (!role) {
+                Swal.showValidationMessage('Vui lòng nhập chức vụ nhân viên.');
                 return undefined;
             }
             const totalSalary = parseNumberInput(document.getElementById('employeeTotalSalary').value);
@@ -1196,7 +1202,7 @@ async function editEmployee(uid) {
             return {
                 displayName,
                 department: document.getElementById('employeeDepartment').value.trim(),
-                role: document.getElementById('employeeRole').value,
+                role,
                 payroll: {
                     totalSalary,
                     insuranceSalary,
@@ -1244,6 +1250,50 @@ async function toggleEmployee(uid) {
     } catch (error) {
         console.error(error);
         Swal.fire('Lỗi', 'Không thể cập nhật trạng thái nhân viên.', 'error');
+    }
+}
+
+async function deleteEmployee(uid) {
+    const employee = employees.find(item => item.uid === uid);
+    if (!employee) return;
+    const employeeName = employee.displayName || employee.email || 'nhân viên này';
+    const result = await Swal.fire({
+        title: 'Xóa vĩnh viễn nhân viên?',
+        text: `Tài khoản đăng nhập, hồ sơ, lịch sử chấm công và dữ liệu lương của ${employeeName} sẽ bị xóa. Thao tác này không thể hoàn tác.`,
+        input: 'text',
+        inputPlaceholder: 'Nhập XOA để xác nhận',
+        inputAttributes: { autocomplete: 'off', 'aria-label': 'Nhập XOA để xác nhận xóa' },
+        showCancelButton: true,
+        confirmButtonText: 'Xóa nhân viên',
+        cancelButtonText: 'Hủy',
+        confirmButtonColor: '#c2413d',
+        preConfirm: value => {
+            if (String(value || '').trim().toUpperCase() !== 'XOA') {
+                Swal.showValidationMessage('Nhập XOA để xác nhận thao tác xóa.');
+                return undefined;
+            }
+            return true;
+        }
+    });
+    if (!result.isConfirmed) return;
+
+    const deleteButton = document.querySelector(`[data-delete-employee="${CSS.escape(uid)}"]`);
+    if (deleteButton) deleteButton.disabled = true;
+    try {
+        const deleteEmployeeAccount = httpsCallable(functions, 'deleteEmployeeAccount');
+        await deleteEmployeeAccount({ uid });
+        await loadEmployees();
+        Swal.fire({ icon: 'success', title: 'Đã xóa nhân viên', timer: 1500, showConfirmButton: false });
+    } catch (error) {
+        console.error(error);
+        const message = error.code === 'functions/permission-denied'
+            ? 'Bạn không có quyền xóa nhân viên.'
+            : error.code === 'functions/not-found'
+                ? 'Không tìm thấy nhân viên cần xóa.'
+                : 'Không thể xóa nhân viên. Hãy kiểm tra Callable Function đã được triển khai.';
+        Swal.fire('Xóa thất bại', message, 'error');
+    } finally {
+        if (deleteButton) deleteButton.disabled = false;
     }
 }
 
@@ -1470,7 +1520,7 @@ async function openPayrollModal(uid) {
             updatedBy: currentUser.uid
         });
         preparePayrollPrint(employee, summary);
-        window.print();
+        openPrintDialog();
     } catch (error) {
         console.error(error);
         Swal.fire('Lỗi', 'Không thể lưu phiếu lương. Hãy kiểm tra Firestore Rules.', 'error');
@@ -1511,12 +1561,113 @@ function preparePayrollPrint(employee, summary) {
 
 document.getElementById('employeeSearch').addEventListener('input', renderEmployees);
 document.getElementById('refreshEmployeesBtn').addEventListener('click', loadEmployees);
+document.getElementById('createEmployeeBtn').addEventListener('click', createEmployeeAccount);
 document.getElementById('adminMonth').value = todayStr.slice(0, 7);
 document.getElementById('adminMonth').addEventListener('change', () => {
     updateAdminSummary();
     renderEmployees();
 });
 document.getElementById('adminStatusFilter').addEventListener('change', renderEmployees);
+
+async function createEmployeeAccount() {
+    const result = await Swal.fire({
+        title: 'Tạo tài khoản nhân viên',
+        html: `
+            <input id="newEmployeeName" class="swal2-input" maxlength="80" placeholder="Họ và tên">
+            <input id="newEmployeeRole" class="swal2-input" maxlength="80" placeholder="Chức vụ, ví dụ: Kế toán">
+            <input id="newEmployeeLogin" class="swal2-input" autocomplete="off" placeholder="Tên đăng nhập hoặc email">
+            <input id="newEmployeePassword" class="swal2-input" type="password" autocomplete="new-password" placeholder="Mật khẩu (ít nhất 6 ký tự)">
+            <input id="newEmployeeDepartment" class="swal2-input" maxlength="80" placeholder="Phòng ban / Bộ phận (không bắt buộc)">`,
+        showCancelButton: true,
+        confirmButtonText: 'Tạo tài khoản',
+        cancelButtonText: 'Hủy',
+        focusConfirm: false,
+        preConfirm: () => {
+            const displayName = document.getElementById('newEmployeeName').value.trim();
+            const role = document.getElementById('newEmployeeRole').value.trim();
+            const login = document.getElementById('newEmployeeLogin').value.trim();
+            const password = document.getElementById('newEmployeePassword').value;
+            const department = document.getElementById('newEmployeeDepartment').value.trim();
+            if (!displayName || !role || !login || !password) {
+                Swal.showValidationMessage('Vui lòng nhập tên, chức vụ, tài khoản và mật khẩu.');
+                return undefined;
+            }
+            if (/\s/.test(login)) {
+                Swal.showValidationMessage('Tên đăng nhập không được chứa khoảng trắng.');
+                return undefined;
+            }
+            if (password.length < 6) {
+                Swal.showValidationMessage('Mật khẩu phải có ít nhất 6 ký tự.');
+                return undefined;
+            }
+            return { displayName, role, email: normalizeLoginIdentifier(login), password, department };
+        }
+    });
+    if (!result.isConfirmed) return;
+
+    const createButton = document.getElementById('createEmployeeBtn');
+    createButton.disabled = true;
+    let newUser = null;
+    try {
+        const credential = await createUserWithEmailAndPassword(
+            accountCreationAuth,
+            result.value.email,
+            result.value.password
+        );
+        newUser = credential.user;
+        const profileRef = doc(db, 'users', newUser.uid);
+        const auditRef = doc(db, 'auditLogs', `${Date.now()}-${newUser.uid}`);
+        const batch = writeBatch(db);
+        batch.set(profileRef, {
+            displayName: result.value.displayName,
+            email: result.value.email,
+            department: result.value.department,
+            role: result.value.role,
+            active: true,
+            createdAt: serverTimestamp(),
+            createdBy: currentUser.uid
+        });
+        batch.set(auditRef, {
+            action: 'CREATE_EMPLOYEE_ACCOUNT',
+            employeeUid: newUser.uid,
+            email: result.value.email,
+            displayName: result.value.displayName,
+            createdBy: currentUser.uid,
+            createdAt: serverTimestamp()
+        });
+        await batch.commit();
+        await signOut(accountCreationAuth).catch(error => {
+            console.warn('Không thể đóng phiên Firebase Auth phụ.', error);
+        });
+        await loadEmployees();
+        Swal.fire({
+            icon: 'success',
+            title: 'Đã tạo tài khoản',
+            text: `Nhân viên có thể đăng nhập bằng ${result.value.email} và mật khẩu vừa tạo.`,
+            confirmButtonText: 'Đóng'
+        });
+    } catch (error) {
+        console.error(error);
+        if (newUser) {
+            try {
+                await deleteUser(newUser);
+            } catch (cleanupError) {
+                console.error('Không thể hoàn tác tài khoản Auth sau khi tạo hồ sơ thất bại.', cleanupError);
+            }
+            await signOut(accountCreationAuth).catch(() => {});
+        }
+        const message = error.code === 'auth/email-already-in-use'
+            ? 'Tên đăng nhập hoặc email này đã được sử dụng.'
+            : error.code === 'auth/invalid-email'
+                ? 'Email không hợp lệ.'
+                : error.code === 'auth/weak-password'
+                    ? 'Mật khẩu chưa đủ mạnh, hãy dùng ít nhất 6 ký tự.'
+                    : 'Không thể tạo tài khoản. Hãy kiểm tra quyền Firebase Auth và Firestore Rules.';
+        Swal.fire('Tạo tài khoản thất bại', message, 'error');
+    } finally {
+        createButton.disabled = false;
+    }
+}
 
 function updateOvertimeScheduleForm() {
     const date = document.getElementById('overtimeScheduleDate').value;
@@ -1640,16 +1791,6 @@ window.saveAttendance = async function () {
     }
 
     const todaySchedule = getAttendanceSchedule(date);
-    if (todayHoliday && !todaySchedule) {
-        Swal.fire({
-            icon: 'info',
-            title: 'Hôm nay được nghỉ lễ',
-            text: `${todayHoliday.name} theo quy định nghỉ lễ của Nhà nước.`,
-            confirmButtonColor: '#4f46e5'
-        });
-        return;
-    }
-
     const now = new Date();
     const vietnamParts = new Intl.DateTimeFormat('en-GB', {
         timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', hour12: false
@@ -1688,13 +1829,13 @@ window.saveAttendance = async function () {
 
     if (isLeaveStatus) {
         // Kiểm tra giới hạn: nút nghỉ chỉ được thao tác 1 lần và kiểm tra giờ quy định
-        if (totalCurrentMinutes > 8 * 60) {
+        if (!todayHoliday && totalCurrentMinutes > 8 * 60) {
             finalStatus = "Nghỉ không lương";
         } else {
             finalStatus = status;
         }
 
-        if (totalCurrentMinutes > 12 * 60) {
+        if (!todayHoliday && totalCurrentMinutes > 12 * 60) {
             Swal.fire({
                 icon: 'warning',
                 title: 'Quá giờ báo nghỉ!',
@@ -2025,7 +2166,7 @@ window.openReportModal = function () {
     }).then((result) => {
         if (result.isConfirmed) {
             preparePrintData();
-            window.print();
+            openPrintDialog();
         }
     });
 };
