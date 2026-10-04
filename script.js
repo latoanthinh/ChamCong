@@ -1,7 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs, getDoc, setDoc, doc, query, orderBy, writeBatch, serverTimestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, getDoc, setDoc, doc, query, orderBy, writeBatch, serverTimestamp, deleteDoc, deleteField } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, deleteUser, signOut, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCj1poSyx9DNXgeA27BP4-M-F1KV5ETFRI",
@@ -16,7 +15,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const functions = getFunctions(app);
 const accountCreationApp = initializeApp(firebaseConfig, 'employee-account-creation');
 const accountCreationAuth = getAuth(accountCreationApp);
 const authScreen = document.getElementById('authScreen');
@@ -31,6 +29,7 @@ let attendanceCollection = null;
 let employees = [];
 let employeeAttendance = new Map();
 let attendanceSchedules = {};
+let blockedLoginMessage = '';
 
 const pageLoader = document.getElementById('pageLoader');
 const pageLoaderText = document.getElementById('pageLoaderText');
@@ -940,7 +939,7 @@ async function loadEmployees() {
     try {
         const snapshot = await getDocs(collection(db, 'users'));
         employees = snapshot.docs.map(employeeDoc => ({ uid: employeeDoc.id, ...employeeDoc.data() }))
-            .filter(employee => employee.uid !== currentUser.uid)
+            .filter(employee => employee.uid !== currentUser.uid && employee.deleted !== true)
             .sort((first, second) => String(first.displayName || first.email || '').localeCompare(String(second.displayName || second.email || ''), 'vi'));
         employeeAttendance = new Map();
         const migrationBatches = [];
@@ -1257,43 +1256,62 @@ async function deleteEmployee(uid) {
     const employee = employees.find(item => item.uid === uid);
     if (!employee) return;
     const employeeName = employee.displayName || employee.email || 'nhân viên này';
-    const result = await Swal.fire({
-        title: 'Xóa vĩnh viễn nhân viên?',
-        text: `Tài khoản đăng nhập, hồ sơ, lịch sử chấm công và dữ liệu lương của ${employeeName} sẽ bị xóa. Thao tác này không thể hoàn tác.`,
-        input: 'text',
-        inputPlaceholder: 'Nhập XOA để xác nhận',
-        inputAttributes: { autocomplete: 'off', 'aria-label': 'Nhập XOA để xác nhận xóa' },
-        showCancelButton: true,
-        confirmButtonText: 'Xóa nhân viên',
-        cancelButtonText: 'Hủy',
-        confirmButtonColor: '#c2413d',
-        preConfirm: value => {
-            if (String(value || '').trim().toUpperCase() !== 'XOA') {
-                Swal.showValidationMessage('Nhập XOA để xác nhận thao tác xóa.');
-                return undefined;
-            }
-            return true;
-        }
-    });
-    if (!result.isConfirmed) return;
-
     const deleteButton = document.querySelector(`[data-delete-employee="${CSS.escape(uid)}"]`);
     if (deleteButton) deleteButton.disabled = true;
+    Swal.fire({
+        title: 'Đang xóa nhân viên',
+        text: `Đang xóa hồ sơ, chấm công và lương của ${employeeName}...`,
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
     try {
-        const deleteEmployeeAccount = httpsCallable(functions, 'deleteEmployeeAccount');
-        await deleteEmployeeAccount({ uid });
+        await setDoc(doc(db, 'users', uid), {
+            active: false,
+            deleted: true,
+            deletedAt: serverTimestamp(),
+            deletedBy: currentUser.uid
+        }, { merge: true });
+        await deleteUserSubcollection(uid, 'attendance');
+        await deleteUserSubcollection(uid, 'payroll');
+        await setDoc(doc(db, 'users', uid), {
+            displayName: deleteField(),
+            email: deleteField(),
+            department: deleteField(),
+            role: deleteField(),
+            attendanceSchedules: deleteField(),
+            payroll: deleteField()
+        }, { merge: true });
+        try {
+            await setDoc(doc(db, 'auditLogs', `${Date.now()}-${uid}`), {
+                action: 'DELETE_EMPLOYEE_DATA',
+                employeeUid: uid,
+                deletedBy: currentUser.uid,
+                deletedAt: serverTimestamp()
+            });
+        } catch (auditError) {
+            console.warn('Không thể ghi nhật ký xóa nhân viên.', auditError);
+        }
         await loadEmployees();
-        Swal.fire({ icon: 'success', title: 'Đã xóa nhân viên', timer: 1500, showConfirmButton: false });
+        Swal.fire({
+            icon: 'success',
+            title: 'Đã xóa dữ liệu nhân viên',
+            text: 'Tài khoản đã bị chặn truy cập ứng dụng. Tài khoản đăng nhập Firebase vẫn còn do giới hạn gói miễn phí.',
+            confirmButtonText: 'Đóng'
+        });
     } catch (error) {
         console.error(error);
-        const message = error.code === 'functions/permission-denied'
-            ? 'Bạn không có quyền xóa nhân viên.'
-            : error.code === 'functions/not-found'
-                ? 'Không tìm thấy nhân viên cần xóa.'
-                : 'Không thể xóa nhân viên. Hãy kiểm tra Callable Function đã được triển khai.';
-        Swal.fire('Xóa thất bại', message, 'error');
+        Swal.fire('Xóa chưa hoàn tất', 'Không thể xóa hết dữ liệu nhân viên. Tài khoản đã được khóa trong ứng dụng; kiểm tra Firestore Rules rồi thử lại.', 'error');
     } finally {
         if (deleteButton) deleteButton.disabled = false;
+    }
+}
+
+async function deleteUserSubcollection(uid, collectionName) {
+    const snapshot = await getDocs(collection(db, 'users', uid, collectionName));
+    for (let start = 0; start < snapshot.docs.length; start += 450) {
+        const batch = writeBatch(db);
+        snapshot.docs.slice(start, start + 450).forEach(record => batch.delete(record.ref));
+        await batch.commit();
     }
 }
 
@@ -2356,6 +2374,10 @@ onAuthStateChanged(auth, async (user) => {
     currentUser = user;
     if (!user) {
         resetLoginForm();
+        if (blockedLoginMessage) {
+            authError.textContent = blockedLoginMessage;
+            blockedLoginMessage = '';
+        }
         authScreen.classList.remove('hidden');
         appScreen.classList.add('hidden');
         attendanceCollection = null;
@@ -2365,14 +2387,19 @@ onAuthStateChanged(auth, async (user) => {
 
     try {
         attendanceCollection = getUserAttendanceCollection();
+        const profileSnapshot = await getDoc(doc(db, 'users', user.uid));
+        const profile = profileSnapshot.exists() ? profileSnapshot.data() : {};
+        if (profile.deleted === true) {
+            blockedLoginMessage = 'Tài khoản này đã bị quản trị viên xóa khỏi ứng dụng.';
+            await signOut(auth);
+            return;
+        }
         authScreen.classList.add('hidden');
         appScreen.classList.remove('hidden');
         const isAdmin = user.email?.toLowerCase() === adminEmail;
         document.getElementById('adminPanel').classList.toggle('hidden', !isAdmin);
         document.getElementById('employeeWorkspace').classList.toggle('hidden', isAdmin);
         document.getElementById('appTitle').textContent = isAdmin ? 'Bảng quản lý nhân viên' : 'Sổ chấm công cá nhân';
-        const profileSnapshot = await getDoc(doc(db, 'users', user.uid));
-        const profile = profileSnapshot.exists() ? profileSnapshot.data() : {};
         attendanceSchedules = profile.attendanceSchedules || {};
         const displayName = profile.displayName || user.displayName || user.email || 'Người dùng';
         const displayNameInput = document.getElementById('displayNameInput');
