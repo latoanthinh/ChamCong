@@ -1862,7 +1862,7 @@ input[readonly] {
     }
 }
 
-@media (max-width: 650px) {
+@media (max-width: 650px), (hover: none) and (pointer: coarse) {
     .auth-shell {
         display: block;
     }
