@@ -187,6 +187,28 @@
                     <button id="saveOvertimeScheduleBtn" type="button" class="btn-primary">Áp dụng lịch</button>
                 </div>
             </section>
+            <section class="overtime-schedule holiday-schedule" aria-labelledby="holidayScheduleTitle">
+                <div>
+                    <span class="eyebrow">ĐIỀU CHỈNH NGÀY NGHỈ</span>
+                    <h3 id="holidayScheduleTitle">Lịch nghỉ của nhân viên</h3>
+                    <p>Thiết lập ngày nghỉ riêng theo lịch công ty và đồng bộ cho toàn bộ nhân viên.</p>
+                </div>
+                <div class="overtime-schedule-fields holiday-schedule-fields">
+                    <label>
+                        <span>Ngày nghỉ</span>
+                        <input id="holidayScheduleDate" type="date">
+                    </label>
+                    <label>
+                        <span>Tên ngày nghỉ</span>
+                        <input id="holidayScheduleName" type="text" maxlength="80" placeholder="Ví dụ: Nghỉ bù">
+                    </label>
+                </div>
+                <div class="overtime-schedule-actions">
+                    <span id="holidayScheduleStatus" role="status" aria-live="polite"></span>
+                    <button id="clearHolidayScheduleBtn" type="button" class="btn-outline">Xóa lịch ngày này</button>
+                    <button id="saveHolidayScheduleBtn" type="button" class="btn-primary">Áp dụng ngày nghỉ</button>
+                </div>
+            </section>
             <div class="admin-dashboard">
                 <div class="admin-dashboard-heading">
                     <div>

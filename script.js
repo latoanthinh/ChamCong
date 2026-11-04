@@ -29,6 +29,7 @@ let attendanceCollection = null;
 let employees = [];
 let employeeAttendance = new Map();
 let attendanceSchedules = {};
+let holidaySchedules = {};
 let blockedLoginMessage = '';
 
 const pageLoader = document.getElementById('pageLoader');
@@ -209,6 +210,7 @@ function updateTodayStatusCard() {
     if (!card || !label || !hint || !checkInLabel || !checkOutLabel) return;
 
     const todaySchedule = getAttendanceSchedule(todayStr);
+    const todayHoliday = getHolidayInfo(todayStr);
     if (scheduleNote) {
         scheduleNote.classList.toggle('hidden', !todaySchedule);
         if (todaySchedule) {
@@ -384,6 +386,10 @@ const fixedObservanceNames = {
 };
 function getHolidayInfo(date) {
     if (typeof date !== 'string' || date.length < 10) return null;
+    const customHolidayName = holidaySchedules?.[date];
+    if (typeof customHolidayName === 'string' && customHolidayName.trim()) {
+        return { name: customHolidayName.trim(), date, official: false, custom: true };
+    }
     const monthDay = date.slice(5);
     const officialName = fixedHolidayNames[monthDay];
     if (officialName) return { name: officialName, date, official: true };
@@ -408,7 +414,7 @@ function getHolidayInfo(date) {
     return lunarObservanceName ? { name: lunarObservanceName, date, official: false } : null;
 }
 
-const todayHoliday = getHolidayInfo(todayStr);
+let todayHoliday = getHolidayInfo(todayStr);
 const MIN_CALENDAR_YEAR = 1900;
 const MAX_CALENDAR_YEAR = 2100;
 let calendarCursor = new Date(Number(todayStr.slice(0, 4)), Number(todayStr.slice(5, 7)) - 1, 1);
@@ -536,7 +542,10 @@ function getHolidayDetail(date) {
         'Tết Trung thu': 'Ngày 15 tháng 8 Âm lịch, Tết Thiếu nhi và ngày hội trăng rằm truyền thống.',
         'Ngày Ông Công, Ông Táo': 'Ngày 23 tháng Chạp Âm lịch, phong tục tiễn Ông Công, Ông Táo về trời.'
     };
-    return { ...holiday, lunar: lunarDateLabel(date), detail: details[holiday.name] || 'Ngày nghỉ lễ theo quy định.' };
+    const detail = holiday.custom
+        ? 'Ngày nghỉ do quản trị viên thiết lập cho toàn bộ nhân viên.'
+        : details[holiday.name] || 'Ngày nghỉ lễ theo quy định.';
+    return { ...holiday, lunar: lunarDateLabel(date), detail };
 }
 
 function getCalendarDateKey(year, month, day) {
@@ -592,7 +601,7 @@ function showHolidayDetail(date) {
     Swal.fire({
         icon: 'info',
         title: holiday.name,
-        html: `<div class="holiday-dialog"><p><b>Dương lịch:</b> ${escapeHtml(date.split('-').reverse().join('/'))}</p><p><b>Âm lịch:</b> ${escapeHtml(holiday.lunar)}</p><p>${escapeHtml(holiday.detail)}</p><span class="holiday-dialog-badge">${holiday.official ? 'Ngày nghỉ hưởng lương' : 'Ngày lễ / kỷ niệm phổ biến'}</span></div>`,
+        html: `<div class="holiday-dialog"><p><b>Dương lịch:</b> ${escapeHtml(date.split('-').reverse().join('/'))}</p><p><b>Âm lịch:</b> ${escapeHtml(holiday.lunar)}</p><p>${escapeHtml(holiday.detail)}</p><span class="holiday-dialog-badge">${holiday.custom ? 'Ngày nghỉ do công ty sắp xếp' : holiday.official ? 'Ngày nghỉ hưởng lương' : 'Ngày lễ / kỷ niệm phổ biến'}</span></div>`,
         confirmButtonText: 'Đã hiểu',
         confirmButtonColor: '#4f46e5'
     });
@@ -972,6 +981,7 @@ async function loadEmployees() {
         updateAdminSummary();
         renderEmployees();
         updateOvertimeScheduleForm();
+        updateHolidayScheduleForm();
     } catch (error) {
         console.error(error);
         list.innerHTML = '<p style="color:var(--danger);">Không thể tải danh sách nhân viên. Hãy kiểm tra Firestore Rules.</p>';
@@ -1279,6 +1289,7 @@ async function deleteEmployee(uid) {
             department: deleteField(),
             role: deleteField(),
             attendanceSchedules: deleteField(),
+            holidaySchedules: deleteField(),
             payroll: deleteField()
         }, { merge: true });
         try {
@@ -1642,6 +1653,7 @@ async function createEmployeeAccount() {
             department: result.value.department,
             role: result.value.role,
             active: true,
+            holidaySchedules: getSharedHolidaySchedules(),
             createdAt: serverTimestamp(),
             createdBy: currentUser.uid
         });
@@ -1790,10 +1802,119 @@ async function saveOvertimeSchedule(clearSchedule = false) {
     }
 }
 
+function getSharedHolidaySchedules() {
+    const schedules = {};
+    employees.forEach(employee => {
+        Object.entries(employee.holidaySchedules || {}).forEach(([date, name]) => {
+            if (typeof name === 'string' && name.trim() && !schedules[date]) {
+                schedules[date] = name.trim();
+            }
+        });
+    });
+    return schedules;
+}
+
+function updateHolidayScheduleForm() {
+    const date = document.getElementById('holidayScheduleDate').value;
+    const schedules = employees.map(employee => employee.holidaySchedules?.[date]).filter(Boolean);
+    const uniqueNames = [...new Set(schedules)];
+    const nameInput = document.getElementById('holidayScheduleName');
+    const status = document.getElementById('holidayScheduleStatus');
+    const clearButton = document.getElementById('clearHolidayScheduleBtn');
+
+    if (uniqueNames.length === 1) {
+        nameInput.value = uniqueNames[0];
+        status.textContent = `Đã thiết lập “${uniqueNames[0]}” cho ${schedules.length} nhân viên.`;
+        clearButton.disabled = false;
+    } else if (uniqueNames.length > 1) {
+        nameInput.value = '';
+        status.textContent = 'Tên ngày nghỉ đang khác nhau giữa các nhân viên. Nhập tên mới để đồng bộ.';
+        clearButton.disabled = false;
+    } else {
+        nameInput.value = '';
+        status.textContent = 'Chưa thiết lập ngày nghỉ cho ngày này.';
+        clearButton.disabled = true;
+    }
+}
+
+async function saveHolidaySchedule(clearSchedule = false) {
+    const date = document.getElementById('holidayScheduleDate').value;
+    const name = document.getElementById('holidayScheduleName').value.trim();
+    const button = document.getElementById(clearSchedule ? 'clearHolidayScheduleBtn' : 'saveHolidayScheduleBtn');
+    if (!date) {
+        Swal.fire('Thiếu ngày', 'Vui lòng chọn ngày nghỉ.', 'warning');
+        return;
+    }
+    if (!clearSchedule && !name) {
+        Swal.fire('Thiếu tên ngày nghỉ', 'Vui lòng nhập tên ngày nghỉ.', 'warning');
+        return;
+    }
+    if (!employees.length) {
+        Swal.fire('Chưa có nhân viên', 'Không có hồ sơ nhân viên để áp dụng lịch.', 'info');
+        return;
+    }
+
+    button.disabled = true;
+    try {
+        const batches = [];
+        let batch = writeBatch(db);
+        let batchSize = 0;
+        employees.forEach(employee => {
+            const schedules = { ...(employee.holidaySchedules || {}) };
+            if (clearSchedule) delete schedules[date];
+            else schedules[date] = name;
+            batch.set(doc(db, 'users', employee.uid), {
+                holidaySchedules: schedules,
+                updatedAt: serverTimestamp(),
+                updatedBy: currentUser.uid
+            }, { merge: true });
+            batchSize += 1;
+            if (batchSize === 450) {
+                batches.push(batch.commit());
+                batch = writeBatch(db);
+                batchSize = 0;
+            }
+        });
+        if (batchSize) batches.push(batch.commit());
+        await Promise.all(batches);
+        await setDoc(doc(db, 'auditLogs', `${Date.now()}-${currentUser.uid}`), {
+            action: clearSchedule ? 'DELETE_HOLIDAY_SCHEDULE' : 'UPDATE_HOLIDAY_SCHEDULE',
+            date,
+            name: clearSchedule ? null : name,
+            affectedEmployees: employees.length,
+            updatedBy: currentUser.uid,
+            updatedAt: serverTimestamp()
+        });
+        employees = employees.map(employee => {
+            const schedules = { ...(employee.holidaySchedules || {}) };
+            if (clearSchedule) delete schedules[date];
+            else schedules[date] = name;
+            return { ...employee, holidaySchedules: schedules };
+        });
+        updateHolidayScheduleForm();
+        Swal.fire({
+            icon: 'success',
+            title: clearSchedule ? 'Đã xóa lịch nghỉ' : 'Đã áp dụng ngày nghỉ',
+            text: `${date}: ${clearSchedule ? 'đã xóa ngày nghỉ' : name} · ${employees.length} nhân viên`,
+            timer: 1900,
+            showConfirmButton: false
+        });
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Lỗi', 'Không thể lưu lịch nghỉ. Hãy kiểm tra Firestore Rules.', 'error');
+    } finally {
+        button.disabled = false;
+    }
+}
+
 document.getElementById('overtimeScheduleDate').value = todayStr;
 document.getElementById('overtimeScheduleDate').addEventListener('change', updateOvertimeScheduleForm);
 document.getElementById('saveOvertimeScheduleBtn').addEventListener('click', () => saveOvertimeSchedule());
 document.getElementById('clearOvertimeScheduleBtn').addEventListener('click', () => saveOvertimeSchedule(true));
+document.getElementById('holidayScheduleDate').value = todayStr;
+document.getElementById('holidayScheduleDate').addEventListener('change', updateHolidayScheduleForm);
+document.getElementById('saveHolidayScheduleBtn').addEventListener('click', () => saveHolidaySchedule());
+document.getElementById('clearHolidayScheduleBtn').addEventListener('click', () => saveHolidaySchedule(true));
 
 window.saveAttendance = async function () {
     const date = dateInput.value;
@@ -2401,6 +2522,8 @@ onAuthStateChanged(auth, async (user) => {
         document.getElementById('employeeWorkspace').classList.toggle('hidden', isAdmin);
         document.getElementById('appTitle').textContent = isAdmin ? 'Bảng quản lý nhân viên' : 'Sổ chấm công cá nhân';
         attendanceSchedules = profile.attendanceSchedules || {};
+        holidaySchedules = profile.holidaySchedules || {};
+        todayHoliday = getHolidayInfo(todayStr);
         const displayName = profile.displayName || user.displayName || user.email || 'Người dùng';
         const displayNameInput = document.getElementById('displayNameInput');
         if (displayNameInput) displayNameInput.value = profile.displayName || user.displayName || '';

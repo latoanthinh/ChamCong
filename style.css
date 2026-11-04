@@ -1388,6 +1388,14 @@ input[readonly] {
     width: 100%;
 }
 
+.holiday-schedule {
+    border-left-color: var(--teal);
+}
+
+.holiday-schedule-fields {
+    grid-template-columns: minmax(150px, 1fr) minmax(200px, 2fr);
+}
+
 .overtime-schedule-actions {
     display: flex;
     align-items: center;
@@ -1397,6 +1405,13 @@ input[readonly] {
 }
 
 .overtime-schedule-actions #overtimeScheduleStatus {
+    flex: 1;
+    min-width: 180px;
+    color: var(--muted);
+    font-size: 0.75rem;
+}
+
+.overtime-schedule-actions #holidayScheduleStatus {
     flex: 1;
     min-width: 180px;
     color: var(--muted);
