@@ -2490,10 +2490,67 @@ document.querySelector('[data-action="reminders"]').addEventListener('click', wi
 document.querySelector('[data-action="clear-data"]').addEventListener('click', window.confirmClearData);
 document.getElementById('status').addEventListener('change', window.updateButtonState);
 
+const mobileBottomNav = document.getElementById('mobileBottomNav');
+const mobileNavLinks = [...mobileBottomNav.querySelectorAll('[data-nav-target]')];
+let mobileNavObserver = null;
+
+function setActiveMobileNavLink(activeLink) {
+    mobileNavLinks.forEach(link => {
+        if (link === activeLink && !link.classList.contains('hidden')) {
+            link.setAttribute('aria-current', 'page');
+        } else {
+            link.removeAttribute('aria-current');
+        }
+    });
+}
+
+function configureMobileBottomNav(isAdmin) {
+    const role = isAdmin ? 'admin' : 'employee';
+    const visibleLinks = mobileNavLinks.filter(link => {
+        const isVisible = link.dataset.role === role;
+        link.classList.toggle('hidden', !isVisible);
+        return isVisible;
+    });
+    mobileBottomNav.classList.remove('hidden');
+    setActiveMobileNavLink(visibleLinks[0]);
+    mobileNavObserver?.disconnect();
+
+    if ('IntersectionObserver' in window) {
+        mobileNavObserver = new IntersectionObserver(entries => {
+            const visibleEntry = entries
+                .filter(entry => entry.isIntersecting)
+                .sort((first, second) => first.boundingClientRect.top - second.boundingClientRect.top)[0];
+            if (visibleEntry) {
+                const activeLink = visibleLinks.find(link => link.dataset.navTarget === visibleEntry.target.id);
+                if (activeLink) setActiveMobileNavLink(activeLink);
+            }
+        }, { rootMargin: '0px 0px -65% 0px', threshold: 0 });
+        visibleLinks.forEach(link => {
+            const target = document.getElementById(link.dataset.navTarget);
+            if (target) mobileNavObserver.observe(target);
+        });
+    }
+}
+
+mobileNavLinks.forEach(link => {
+    link.addEventListener('click', event => {
+        event.preventDefault();
+        const target = document.getElementById(link.dataset.navTarget);
+        if (!target) return;
+        setActiveMobileNavLink(link);
+        target.scrollIntoView({
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+            block: 'start'
+        });
+    });
+});
+
 onAuthStateChanged(auth, async (user) => {
     showPageLoader(user ? 'Đang tải dữ liệu tài khoản...' : 'Đang kiểm tra phiên đăng nhập...');
     currentUser = user;
     if (!user) {
+        mobileBottomNav.classList.add('hidden');
+        mobileNavObserver?.disconnect();
         resetLoginForm();
         if (blockedLoginMessage) {
             authError.textContent = blockedLoginMessage;
@@ -2518,6 +2575,7 @@ onAuthStateChanged(auth, async (user) => {
         authScreen.classList.add('hidden');
         appScreen.classList.remove('hidden');
         const isAdmin = user.email?.toLowerCase() === adminEmail;
+        configureMobileBottomNav(isAdmin);
         document.getElementById('adminPanel').classList.toggle('hidden', !isAdmin);
         document.getElementById('employeeWorkspace').classList.toggle('hidden', isAdmin);
         document.getElementById('appTitle').textContent = isAdmin ? 'Bảng quản lý nhân viên' : 'Sổ chấm công cá nhân';
@@ -2539,6 +2597,8 @@ onAuthStateChanged(auth, async (user) => {
         }
     } catch (error) {
         console.error(error);
+        mobileBottomNav.classList.add('hidden');
+        mobileNavObserver?.disconnect();
         appScreen.classList.add('hidden');
         authScreen.classList.remove('hidden');
         authError.textContent = 'Không thể tải dữ liệu tài khoản. Vui lòng thử lại.';

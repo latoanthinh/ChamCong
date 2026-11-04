@@ -187,7 +187,8 @@
                     <button id="saveOvertimeScheduleBtn" type="button" class="btn-primary">Áp dụng lịch</button>
                 </div>
             </section>
-            <section class="overtime-schedule holiday-schedule" aria-labelledby="holidayScheduleTitle">
+            <section id="holidaySchedulePanel" class="overtime-schedule holiday-schedule"
+                aria-labelledby="holidayScheduleTitle">
                 <div>
                     <span class="eyebrow">ĐIỀU CHỈNH NGÀY NGHỈ</span>
                     <h3 id="holidayScheduleTitle">Lịch nghỉ của nhân viên</h3>
@@ -209,7 +210,7 @@
                     <button id="saveHolidayScheduleBtn" type="button" class="btn-primary">Áp dụng ngày nghỉ</button>
                 </div>
             </section>
-            <div class="admin-dashboard">
+            <div id="adminDashboard" class="admin-dashboard">
                 <div class="admin-dashboard-heading">
                     <div>
                         <span class="eyebrow">PHÂN TÍCH NHANH</span>
@@ -268,7 +269,7 @@
                     </article>
                 </div>
             </div>
-            <div class="admin-tools">
+            <div id="adminEmployees" class="admin-tools">
                 <input id="adminMonth" type="month" aria-label="Tháng báo cáo">
                 <select id="adminStatusFilter" aria-label="Lọc trạng thái">
                     <option value="">Tất cả trạng thái</option>
@@ -286,7 +287,7 @@
         </section>
 
         <div id="employeeWorkspace" class="workspace-layout">
-            <section class="attendance-book">
+            <section id="attendanceBook" class="attendance-book">
                 <div class="welcome-panel">
                     <div>
                         <span class="eyebrow">HÔM NAY</span>
@@ -393,7 +394,7 @@
             </section>
 
             <section class="attendance-overview">
-                <div class="calendar-card">
+                <div id="attendanceCalendar" class="calendar-card">
                     <div class="section-heading">
                         <div>
                             <span class="eyebrow">TỔNG QUAN</span>
@@ -420,7 +421,7 @@
                     </div>
                 </div>
 
-                <div class="card report-filter">
+                <div id="attendanceHistory" class="card report-filter">
                     <div class="section-heading">
                         <h3>Lịch sử gần đây</h3>
                         <button id="printOldMonthBtn" type="button" class="btn-text">In báo cáo</button>
@@ -442,6 +443,55 @@
                 </div>
             </section>
         </div>
+        <nav id="mobileBottomNav" class="mobile-bottom-nav hidden" aria-label="Điều hướng nhanh">
+            <a href="#attendanceBook" data-role="employee" data-nav-target="attendanceBook" aria-current="page">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8 3v3m8-3v3M5 9h14M6 5h12a2 2 0 0 1 2 2v12H4V7a2 2 0 0 1 2-2Z" />
+                    <path d="m9 15 2 2 4-4" />
+                </svg>
+                <span>Chấm công</span>
+            </a>
+            <a href="#attendanceCalendar" data-role="employee" data-nav-target="attendanceCalendar">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8 3v3m8-3v3M5 9h14M6 5h12a2 2 0 0 1 2 2v12H4V7a2 2 0 0 1 2-2Z" />
+                    <path d="M8 13h2m4 0h2m-8 4h2m4 0h2" />
+                </svg>
+                <span>Lịch</span>
+            </a>
+            <a href="#attendanceHistory" data-role="employee" data-nav-target="attendanceHistory">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 5h16M4 10h16M4 15h10M4 20h10" />
+                    <circle cx="18" cy="17" r="3" />
+                    <path d="M18 15.5v1.7l1 0.6" />
+                </svg>
+                <span>Lịch sử</span>
+            </a>
+            <a href="#adminDashboard" data-role="admin" data-nav-target="adminDashboard">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 19V5m0 14h16" />
+                    <path d="m7 15 4-4 3 2 5-6" />
+                    <circle cx="7" cy="15" r="1" />
+                    <circle cx="11" cy="11" r="1" />
+                    <circle cx="14" cy="13" r="1" />
+                    <circle cx="19" cy="7" r="1" />
+                </svg>
+                <span>Tổng quan</span>
+            </a>
+            <a href="#adminEmployees" data-role="admin" data-nav-target="adminEmployees">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="9" cy="8" r="3" />
+                    <path d="M3.5 20a5.5 5.5 0 0 1 11 0m3-11a3 3 0 0 1 0 6m1 2a4 4 0 0 1 2 3" />
+                </svg>
+                <span>Nhân viên</span>
+            </a>
+            <a href="#holidaySchedulePanel" data-role="admin" data-nav-target="holidaySchedulePanel">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8 3v3m8-3v3M5 9h14M6 5h12a2 2 0 0 1 2 2v12H4V7a2 2 0 0 1 2-2Z" />
+                    <path d="M12 12v3l2 1" />
+                </svg>
+                <span>Lịch nghỉ</span>
+            </a>
+        </nav>
     </main>
 
     <div id="print-section">
