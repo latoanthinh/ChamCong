@@ -189,10 +189,348 @@ function getInitials(name) {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function updateUserAvatar(displayName) {
+let currentProfilePhotoData = '';
+
+function updateUserAvatar(displayName, photoData = currentProfilePhotoData) {
     const avatar = document.getElementById('userAvatar');
-    if (avatar) avatar.textContent = getInitials(displayName);
+    currentProfilePhotoData = typeof photoData === 'string' && photoData.startsWith('data:image/jpeg;base64,')
+        ? photoData
+        : '';
+    if (avatar) {
+        avatar.textContent = currentProfilePhotoData ? '' : getInitials(displayName);
+        avatar.style.backgroundImage = currentProfilePhotoData ? `url("${currentProfilePhotoData}")` : '';
+        avatar.setAttribute('aria-label', currentProfilePhotoData ? `Ảnh hồ sơ của ${displayName}` : getInitials(displayName));
+    }
 }
+
+const profileEditorModal = document.getElementById('profileEditorModal');
+const profileCropArea = document.getElementById('profileCropArea');
+const profileCropImage = document.getElementById('profileCropImage');
+const profileZoom = document.getElementById('profileZoom');
+const profilePhotoInput = document.getElementById('profilePhotoInput');
+const profilePhotoSaveButton = document.getElementById('saveProfilePhoto');
+const profileEditorStatus = document.getElementById('profileEditorStatus');
+const profileEditorPreview = document.getElementById('profileEditorPreview');
+const profileEditorName = document.getElementById('profileEditorName');
+const profileAvatarButton = document.getElementById('openProfileEditor');
+let profileCropImageReady = false;
+let profileCropPosition = { x: 0, y: 0, zoom: 1, rotation: 0 };
+let profileCropPointer = null;
+let profileEditorReturnFocus = null;
+
+function clampProfileCrop() {
+    const size = profileCropArea.clientWidth;
+    const maxOffset = Math.max(0, (size * profileCropPosition.zoom - size * 6 / 7) / 2);
+    profileCropPosition.x = Math.max(-maxOffset, Math.min(maxOffset, profileCropPosition.x));
+    profileCropPosition.y = Math.max(-maxOffset, Math.min(maxOffset, profileCropPosition.y));
+}
+
+function paintProfileCrop() {
+    clampProfileCrop();
+    const { x, y, zoom, rotation } = profileCropPosition;
+    profileCropImage.parentElement.style.transform =
+        `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${rotation}deg) scale(${zoom.toFixed(3)})`;
+    profileZoom.value = String(Math.round(zoom * 100));
+    profileZoom.style.setProperty('--f', `${((zoom - 1) / 2 * 100).toFixed(1)}%`);
+    profileZoom.setAttribute('aria-valuetext', `${Math.round(zoom * 100)}%`);
+}
+
+async function setProfileEditorImage(dataUrl) {
+    profileCropImage.src = dataUrl;
+    await profileCropImage.decode();
+    profileEditorPreview.src = dataUrl;
+    profileEditorPreview.hidden = false;
+    profileCropArea.classList.add('has-image');
+    profileCropArea.setAttribute('aria-label',
+        'Kéo để chỉnh ảnh. Dùng phím mũi tên để di chuyển, cộng hoặc trừ để phóng to');
+    profileCropImageReady = true;
+    profileCropPosition = { x: 0, y: 0, zoom: 1, rotation: 0 };
+    profileZoom.disabled = false;
+    document.getElementById('profileRotate').disabled = false;
+    profilePhotoSaveButton.disabled = false;
+    paintProfileCrop();
+}
+
+async function openProfileEditor() {
+    if (!currentUser) return;
+    profileEditorReturnFocus = document.activeElement;
+    const displayName = document.getElementById('userDisplayName').textContent.replace(/^Xin chào,?\s*/, '');
+    profileEditorName.textContent = displayName || 'Căn khuôn mặt vào giữa khung tròn';
+    profileEditorStatus.textContent = 'Kéo ảnh để căn chỉnh; cuộn hoặc dùng thanh để phóng to.';
+    profileEditorStatus.classList.remove('is-error');
+    profileEditorModal.classList.remove('hidden');
+    profileCropImageReady = false;
+    profilePhotoSaveButton.disabled = true;
+    profileZoom.disabled = true;
+    document.getElementById('profileRotate').disabled = true;
+    profileCropArea.classList.remove('has-image');
+    profileCropPosition = { x: 0, y: 0, zoom: 1, rotation: 0 };
+    if (currentProfilePhotoData) {
+        try {
+            await setProfileEditorImage(currentProfilePhotoData);
+        } catch (error) {
+            console.error('Không thể mở ảnh hồ sơ hiện tại:', error);
+            profileEditorStatus.textContent = 'Không thể mở ảnh hiện tại. Hãy chọn ảnh mới.';
+            profileEditorStatus.classList.add('is-error');
+        }
+    } else {
+        profileCropImage.removeAttribute('src');
+        profileEditorPreview.removeAttribute('src');
+        profileEditorPreview.hidden = true;
+        profileCropArea.classList.remove('has-image');
+        profileCropImageReady = false;
+        profileCropPosition = { x: 0, y: 0, zoom: 1, rotation: 0 };
+        profileZoom.value = '100';
+        profileZoom.style.setProperty('--f', '0%');
+        profileZoom.disabled = true;
+        document.getElementById('profileRotate').disabled = true;
+        profilePhotoSaveButton.disabled = true;
+    }
+    if (!profileEditorModal.classList.contains('hidden')) {
+        requestAnimationFrame(() => profileCropArea.focus());
+    }
+}
+
+function closeProfileEditor() {
+    profileEditorModal.classList.add('hidden');
+    profileAvatarButton.focus();
+}
+
+async function loadProfilePhoto(file) {
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        profileEditorStatus.textContent = 'Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP.';
+        profileEditorStatus.classList.add('is-error');
+        return;
+    }
+    if (file.size > 12 * 1024 * 1024) {
+        profileEditorStatus.textContent = 'Ảnh gốc phải nhỏ hơn 12 MB.';
+        profileEditorStatus.classList.add('is-error');
+        return;
+    }
+
+    profileEditorStatus.textContent = 'Đang xử lý ảnh...';
+    profileEditorStatus.classList.remove('is-error');
+    profileCropArea.classList.add('busy');
+    document.getElementById('profileCropBusy').textContent = 'Đang xử lý ảnh...';
+    profilePhotoSaveButton.disabled = true;
+    document.getElementById('chooseProfilePhoto').disabled = true;
+    profileZoom.disabled = true;
+    document.getElementById('profileRotate').disabled = true;
+    try {
+        const objectUrl = URL.createObjectURL(file);
+        try {
+            const image = new Image();
+            image.src = objectUrl;
+            await image.decode();
+            const sourceSize = Math.min(image.naturalWidth, image.naturalHeight);
+            const sourceX = (image.naturalWidth - sourceSize) / 2;
+            const sourceY = (image.naturalHeight - sourceSize) / 2;
+            const canvas = document.createElement('canvas');
+            canvas.width = 280;
+            canvas.height = 280;
+            const context = canvas.getContext('2d');
+            if (!context) throw new Error('Trình duyệt không thể xử lý ảnh.');
+            context.imageSmoothingEnabled = true;
+            context.imageSmoothingQuality = 'high';
+            context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, 280, 280);
+            await setProfileEditorImage(canvas.toDataURL('image/jpeg', 0.9));
+        } finally {
+            URL.revokeObjectURL(objectUrl);
+        }
+        profileEditorStatus.textContent = 'Kéo để căn chỉnh; cuộn hoặc dùng thanh để phóng to.';
+    } catch (error) {
+        console.error('Không thể đọc ảnh hồ sơ:', error);
+        profileEditorStatus.textContent = 'Không thể mở ảnh này. Hãy chọn một ảnh khác.';
+        profileEditorStatus.classList.add('is-error');
+    } finally {
+        profileCropArea.classList.remove('busy');
+        profilePhotoInput.value = '';
+        profilePhotoSaveButton.disabled = !profileCropImageReady;
+        document.getElementById('chooseProfilePhoto').disabled = false;
+        profileZoom.disabled = !profileCropImageReady;
+        document.getElementById('profileRotate').disabled = !profileCropImageReady;
+    }
+}
+
+function createCroppedProfilePhoto() {
+    const size = profileCropArea.clientWidth;
+    const canvas = document.createElement('canvas');
+    canvas.width = 240;
+    canvas.height = 240;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Trình duyệt không thể tạo ảnh đại diện.');
+    const scale = 240 / size;
+    context.translate(120 + profileCropPosition.x * scale, 120 + profileCropPosition.y * scale);
+    context.rotate(profileCropPosition.rotation * Math.PI / 180);
+    context.scale(profileCropPosition.zoom, profileCropPosition.zoom);
+    context.drawImage(profileCropImage, -size / 2, -size / 2, size, size);
+    const photoData = canvas.toDataURL('image/jpeg', 0.82);
+    if (photoData.length > 100_000) {
+        throw new Error('Ảnh sau khi nén vượt quá giới hạn lưu trữ. Hãy chọn ảnh khác.');
+    }
+    return photoData;
+}
+
+function animateProfilePhotoToAvatar(photoData, source) {
+    const target = document.getElementById('userAvatar').getBoundingClientRect();
+    const size = 240;
+    const startX = source.left + (source.width - source.height) / 2 + source.width * 20 / 280;
+    const startY = source.top + source.height * 20 / 280;
+    const fly = document.createElement('div');
+    const image = document.createElement('img');
+    fly.className = 'u069-fly';
+    fly.style.left = `${startX}px`;
+    fly.style.top = `${startY}px`;
+    image.src = photoData;
+    image.alt = '';
+    fly.appendChild(image);
+    document.body.appendChild(fly);
+    const animation = fly.animate([
+        { transform: 'translate(0, 0) scale(1)' },
+        {
+            transform: `translate(${target.left + target.width / 2 - startX - size / 2}px, ${target.top + target.height / 2 - startY - size / 2}px) scale(${target.width / size})`
+        }
+    ], {
+        duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 650,
+        easing: 'cubic-bezier(.6,0,.2,1)',
+        fill: 'forwards'
+    });
+    animation.onfinish = () => {
+        fly.remove();
+        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            profileAvatarButton.animate(
+                [{ transform: 'scale(1)' }, { transform: 'scale(1.12)' }, { transform: 'scale(1)' }],
+                { duration: 360, easing: 'cubic-bezier(.34,1.5,.64,1)' }
+            );
+        }
+    };
+}
+
+async function saveProfilePhoto() {
+    const user = currentUser;
+    if (!user || !profileCropImageReady) return;
+    profilePhotoSaveButton.disabled = true;
+    document.getElementById('chooseProfilePhoto').disabled = true;
+    profileZoom.disabled = true;
+    document.getElementById('profileRotate').disabled = true;
+    profileCropArea.classList.add('busy');
+    document.getElementById('profileCropBusy').textContent = 'Đang lưu ảnh...';
+    profileEditorStatus.textContent = 'Đang lưu ảnh hồ sơ...';
+    profileEditorStatus.classList.remove('is-error');
+    try {
+        const photoData = createCroppedProfilePhoto();
+        const source = profileCropArea.getBoundingClientRect();
+        await setDoc(doc(db, 'users', user.uid), { photoData }, { merge: true });
+        if (currentUser?.uid !== user.uid) return;
+        updateUserAvatar(
+            document.getElementById('userDisplayName').textContent.replace(/^Xin chào,?\s*/, ''),
+            photoData
+        );
+        profileEditorPreview.src = photoData;
+        profileEditorModal.classList.add('hidden');
+        animateProfilePhotoToAvatar(photoData, source);
+        if (profileEditorReturnFocus?.isConnected) profileEditorReturnFocus.focus();
+        else profileAvatarButton.focus();
+        Swal.fire({ icon: 'success', title: 'Đã cập nhật ảnh hồ sơ', timer: 1400, showConfirmButton: false });
+    } catch (error) {
+        console.error('Không thể lưu ảnh hồ sơ:', error);
+        profileEditorStatus.textContent = error.message || 'Không thể lưu ảnh hồ sơ. Vui lòng thử lại.';
+        profileEditorStatus.classList.add('is-error');
+    } finally {
+        profileCropArea.classList.remove('busy');
+        profilePhotoSaveButton.disabled = !profileCropImageReady;
+        document.getElementById('chooseProfilePhoto').disabled = false;
+        profileZoom.disabled = !profileCropImageReady;
+        document.getElementById('profileRotate').disabled = !profileCropImageReady;
+    }
+}
+
+profileAvatarButton.addEventListener('click', openProfileEditor);
+document.getElementById('closeProfileEditor').addEventListener('click', closeProfileEditor);
+document.getElementById('chooseProfilePhoto').addEventListener('click', () => profilePhotoInput.click());
+document.getElementById('profileRotate').addEventListener('click', () => {
+    profileCropPosition.rotation = (profileCropPosition.rotation + 90) % 360;
+    paintProfileCrop();
+});
+profileZoom.addEventListener('input', () => {
+    profileCropArea.classList.add('now');
+    profileCropPosition.zoom = Number(profileZoom.value) / 100;
+    paintProfileCrop();
+});
+profileZoom.addEventListener('change', () => profileCropArea.classList.remove('now'));
+profilePhotoInput.addEventListener('change', () => loadProfilePhoto(profilePhotoInput.files?.[0]));
+profilePhotoSaveButton.addEventListener('click', saveProfilePhoto);
+profileCropArea.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || !profileCropImageReady || profileCropArea.classList.contains('busy')) return;
+    profileCropPointer = {
+        id: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        x: profileCropPosition.x,
+        y: profileCropPosition.y
+    };
+    profileCropArea.setPointerCapture(event.pointerId);
+    profileCropArea.classList.add('drag');
+});
+profileCropArea.addEventListener('pointermove', event => {
+    if (!profileCropPointer || profileCropPointer.id !== event.pointerId) return;
+    const scale = profileCropArea.clientWidth / profileCropArea.getBoundingClientRect().width;
+    profileCropPosition.x = profileCropPointer.x + (event.clientX - profileCropPointer.startX) * scale;
+    profileCropPosition.y = profileCropPointer.y + (event.clientY - profileCropPointer.startY) * scale;
+    paintProfileCrop();
+});
+function endProfileCropDrag(event) {
+    if (!profileCropPointer || profileCropPointer.id !== event.pointerId) return;
+    profileCropPointer = null;
+    profileCropArea.classList.remove('drag');
+}
+profileCropArea.addEventListener('pointerup', endProfileCropDrag);
+profileCropArea.addEventListener('pointercancel', endProfileCropDrag);
+profileCropArea.addEventListener('wheel', event => {
+    if (!profileCropImageReady || profileCropArea.classList.contains('busy')) return;
+    event.preventDefault();
+    profileCropArea.classList.add('now');
+    profileCropPosition.zoom = Math.max(1, Math.min(3, profileCropPosition.zoom * (event.deltaY < 0 ? 1.06 : 0.94)));
+    paintProfileCrop();
+    clearTimeout(profileCropArea.zoomTimeout);
+    profileCropArea.zoomTimeout = setTimeout(() => profileCropArea.classList.remove('now'), 120);
+}, { passive: false });
+profileCropArea.addEventListener('keydown', event => {
+    if (!profileCropImageReady || profileCropArea.classList.contains('busy')) return;
+    const shift = event.shiftKey ? 20 : 6;
+    if (event.key === 'ArrowLeft') profileCropPosition.x += shift;
+    else if (event.key === 'ArrowRight') profileCropPosition.x -= shift;
+    else if (event.key === 'ArrowUp') profileCropPosition.y += shift;
+    else if (event.key === 'ArrowDown') profileCropPosition.y -= shift;
+    else if (event.key === '+' || event.key === '=') profileCropPosition.zoom = Math.min(3, profileCropPosition.zoom + 0.1);
+    else if (event.key === '-') profileCropPosition.zoom = Math.max(1, profileCropPosition.zoom - 0.1);
+    else return;
+    event.preventDefault();
+    paintProfileCrop();
+});
+profileEditorModal.addEventListener('click', event => {
+    if (event.target === profileEditorModal) closeProfileEditor();
+});
+profileEditorModal.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        closeProfileEditor();
+        return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = [...profileEditorModal.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]')]
+        .filter(element => element.offsetParent !== null);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
+});
 
 function formatDisplayDate(dateStr) {
     if (!dateStr || dateStr.length < 10) return dateStr || '';
@@ -322,6 +660,342 @@ function updateLiveClock() {
 
 updateLiveClock();
 window.liveClockTimer = setInterval(updateLiveClock, 1000);
+
+const weatherRoot = document.getElementById('weatherWidget');
+const weatherStatus = document.getElementById('weatherStatus');
+const weatherRefreshBtn = document.getElementById('weatherRefreshBtn');
+const weatherTimeline = document.getElementById('weatherTimeline');
+const weatherHourLabels = document.getElementById('weatherHourLabels');
+let weatherData = null;
+let selectedWeatherHour = 0;
+let weatherRequestId = 0;
+let weatherController = null;
+let weatherRefreshTimer = null;
+
+const weatherConditions = {
+    0: ['Trời quang', 'sun'],
+    1: ['Ít mây', 'sun'],
+    2: ['Mây rải rác', 'cloud'],
+    3: ['Nhiều mây', 'cloud'],
+    45: ['Có sương mù', 'cloud'],
+    48: ['Sương muối', 'cloud'],
+    51: ['Mưa phùn nhẹ', 'rain'],
+    53: ['Mưa phùn', 'rain'],
+    55: ['Mưa phùn dày', 'rain'],
+    56: ['Mưa phùn đóng băng nhẹ', 'snow'],
+    57: ['Mưa phùn đóng băng', 'snow'],
+    61: ['Mưa nhẹ', 'rain'],
+    63: ['Mưa vừa', 'rain'],
+    65: ['Mưa to', 'rain'],
+    66: ['Mưa đóng băng nhẹ', 'snow'],
+    67: ['Mưa đóng băng', 'snow'],
+    71: ['Tuyết nhẹ', 'snow'],
+    73: ['Tuyết vừa', 'snow'],
+    75: ['Tuyết dày', 'snow'],
+    77: ['Mưa tuyết', 'snow'],
+    80: ['Mưa rào nhẹ', 'rain'],
+    81: ['Mưa rào', 'rain'],
+    82: ['Mưa rào lớn', 'rain'],
+    85: ['Tuyết rào nhẹ', 'snow'],
+    86: ['Tuyết rào dày', 'snow'],
+    95: ['Dông', 'storm'],
+    96: ['Dông, mưa đá nhẹ', 'storm'],
+    99: ['Dông, mưa đá', 'storm']
+};
+
+const weatherIconSvg = {
+    sun: '<circle cx="11" cy="11" r="4.4" fill="#FFB020"/><path d="M11 2.5v2M11 17.5v2M2.5 11h2M17.5 11h2M5 5l1.4 1.4M15.6 15.6L17 17M5 17l1.4-1.4M15.6 6.4L17 5" stroke="#FFB020" stroke-width="1.8" stroke-linecap="round"/>',
+    moon: '<path d="M14.5 15.8A6.6 6.6 0 0 1 8.2 4.4a6.6 6.6 0 1 0 8.6 9.2 6.6 6.6 0 0 1-2.3 2.2z" fill="#8B9BFF"/>',
+    cloud: '<circle cx="8" cy="8" r="3.4" fill="#FFB020"/><path d="M7 18a3.6 3.6 0 0 1-.4-7.2 5 5 0 0 1 9.6.8A3.2 3.2 0 0 1 16.4 18z" fill="#A7B1C2"/>',
+    rain: '<path d="M6.6 13a3.6 3.6 0 0 1-.4-7.2 5 5 0 0 1 9.6.8 3.2 3.2 0 0 1 .2 6.4z" fill="#A7B1C2"/><path d="M8 15.5l-1 3M11.5 15.5l-1 3M15 15.5l-1 3" stroke="#3D8BFF" stroke-width="1.8" stroke-linecap="round"/>',
+    snow: '<path d="M7 13a3.6 3.6 0 0 1-.4-7.2 5 5 0 0 1 9.6.8 3.2 3.2 0 0 1 .2 6.4z" fill="#A7B1C2"/><path d="M8 16h.01M12 18h.01M16 16h.01" stroke="#8B9BFF" stroke-width="2.4" stroke-linecap="round"/>',
+    storm: '<path d="M6.6 12.5a3.6 3.6 0 0 1-.4-7.2 5 5 0 0 1 9.6.8 3.2 3.2 0 0 1 .2 6.4z" fill="#A7B1C2"/><path d="m12 13-2 4h3l-1 4 4-6h-3l1-2" fill="#FFB020"/>'
+};
+
+const weatherSky = [
+    [0, '#0B1026', '#1E2656'], [4.5, '#151B44', '#3B3F7A'], [6, '#F3A27E', '#6C7FD8'],
+    [8, '#8ED0FF', '#4A92F0'], [12, '#5CB8FF', '#2F7BFF'], [14.5, '#7DA9D6', '#4E73B0'],
+    [15.5, '#8C9AAD', '#56657A'], [17.4, '#8C9AAD', '#5C6A80'], [18.6, '#FF9F6E', '#7A5CD6'],
+    [20, '#2A2E6E', '#141838'], [24, '#0B1026', '#1E2656']
+];
+
+function weatherTimeHour(time) {
+    const match = /T(\d{2}):(\d{2})/.exec(time || '');
+    return match ? Number(match[1]) + Number(match[2]) / 60 : 0;
+}
+
+function weatherTimeLabel(hour) {
+    return `${String(Math.floor(hour)).padStart(2, '0')}:00`;
+}
+
+function getWeatherCondition(code, isDay) {
+    const [label, icon] = weatherConditions[code] || ['Không rõ', 'cloud'];
+    return { label, icon: code <= 1 && !isDay ? 'moon' : icon };
+}
+
+function setWeatherStatus(message, isError = false) {
+    weatherStatus.textContent = message;
+    weatherStatus.classList.toggle('is-error', isError);
+}
+
+function weatherHexToRgb(hex) {
+    return [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16));
+}
+
+function mixWeatherColors(first, second, amount) {
+    const a = weatherHexToRgb(first);
+    const b = weatherHexToRgb(second);
+    return `rgb(${a.map((value, index) => Math.round(value + (b[index] - value) * amount)).join(',')})`;
+}
+
+function nearestWeatherHourIndex(hour) {
+    return weatherData.hourly.time.reduce((nearest, time, index, times) =>
+        Math.abs(weatherTimeHour(time) - hour) < Math.abs(weatherTimeHour(times[nearest]) - hour)
+            ? index
+            : nearest, 0);
+}
+
+function getWeatherPoint(hour) {
+    const index = nearestWeatherHourIndex(hour);
+    const hourly = weatherData.hourly;
+    const currentHour = weatherTimeHour(weatherData.current.time);
+    const currentHourIndex = Math.max(0, Math.min(23, Math.round(currentHour)));
+    const useCurrent = currentHourIndex === hour;
+    const point = {
+        temperature: useCurrent ? weatherData.current.temperature_2m : hourly.temperature_2m[index],
+        feelsLike: useCurrent ? weatherData.current.apparent_temperature : hourly.apparent_temperature[index],
+        code: useCurrent ? weatherData.current.weather_code : hourly.weather_code[index],
+        cloud: useCurrent ? weatherData.current.cloud_cover : hourly.cloud_cover[index],
+        wind: useCurrent ? weatherData.current.wind_speed_10m : hourly.wind_speed_10m[index],
+        humidity: useCurrent ? weatherData.current.relative_humidity_2m : hourly.relative_humidity_2m[index],
+        isDay: useCurrent ? Boolean(weatherData.current.is_day) : Boolean(hourly.is_day[index]),
+        rainProbability: hourly.precipitation_probability[index]
+    };
+    if (point.temperature === null || point.temperature === undefined || point.code === null || point.code === undefined) {
+        throw new Error('Dữ liệu dự báo theo giờ không đầy đủ.');
+    }
+    return point;
+}
+
+function renderWeatherHour(hour) {
+    if (!weatherData) return;
+    selectedWeatherHour = Math.max(0, Math.min(23, Math.round(hour)));
+    const point = getWeatherPoint(selectedWeatherHour);
+    const condition = getWeatherCondition(point.code, point.isDay);
+    const temperature = Math.round(point.temperature);
+    const info = document.getElementById('weatherTemperature');
+    const summary = document.getElementById('weatherCondition');
+    const selectedTime = document.getElementById('weatherSelectedTime');
+    const orb = weatherRoot.querySelector('.u094-orb');
+    const sky = weatherRoot.querySelector('.u094-sky');
+    const current = weatherData.current;
+    const sunrise = weatherTimeHour(weatherData.daily.sunrise[0]);
+    const sunset = weatherTimeHour(weatherData.daily.sunset[0]);
+    const isDay = point.isDay;
+    const dayDuration = Math.max(1, sunset - sunrise);
+    const nightDuration = Math.max(1, 24 - sunset + sunrise);
+    const progress = isDay
+        ? (selectedWeatherHour - sunrise) / dayDuration
+        : ((selectedWeatherHour - sunset + 24) % 24) / nightDuration;
+    const boundedProgress = Math.max(0, Math.min(1, progress));
+    const inverse = 1 - boundedProgress;
+    const x = inverse * inverse * 120 + 2 * inverse * boundedProgress * 225 + boundedProgress * boundedProgress * 330;
+    const y = inverse * inverse * 206 + 2 * inverse * boundedProgress * -118 + boundedProgress * boundedProgress * 206;
+    const skyIndex = weatherSky.findIndex((entry, index) =>
+        index < weatherSky.length - 1 && weatherSky[index + 1][0] >= selectedWeatherHour);
+    const from = weatherSky[Math.max(0, skyIndex)];
+    const to = weatherSky[Math.min(weatherSky.length - 1, Math.max(0, skyIndex) + 1)];
+    const mix = (selectedWeatherHour - from[0]) / (to[0] - from[0]);
+    const cloud = Math.max(0, Math.min(1, Number(point.cloud || 0) / 100));
+    const rainy = [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99].includes(point.code);
+    const timeLabel = weatherTimeLabel(selectedWeatherHour);
+    const detail = [
+        point.feelsLike === null || point.feelsLike === undefined
+            ? null
+            : `Cảm giác như ${Math.round(point.feelsLike)}°`,
+        point.rainProbability === null || point.rainProbability === undefined
+            ? null
+            : `Mưa ${Math.round(point.rainProbability)}%`,
+        point.humidity === null || point.humidity === undefined ? null : `Độ ẩm ${Math.round(point.humidity)}%`,
+        point.wind === null || point.wind === undefined ? null : `Gió ${Math.round(point.wind)} km/h`
+    ].filter(Boolean).join(' · ');
+
+    sky.style.setProperty('--s1', mixWeatherColors(from[1], to[1], mix));
+    sky.style.setProperty('--s2', mixWeatherColors(from[2], to[2], mix));
+    sky.style.setProperty('--cloud', cloud.toFixed(2));
+    sky.style.setProperty('--night', isDay ? '0' : Math.max(0.35, 1 - cloud * 0.65).toFixed(2));
+    orb.className = `u094-orb ${isDay ? 'sun' : 'moon'}`;
+    orb.style.setProperty('--ox', `${x.toFixed(1)}px`);
+    orb.style.setProperty('--oy', `${y.toFixed(1)}px`);
+    orb.style.opacity = String(Math.max(0.35, Math.min(1, Math.sin(Math.PI * boundedProgress) * 3.5)));
+    weatherRoot.classList.toggle('rain', rainy);
+    info.textContent = `${temperature}°`;
+    summary.textContent = condition.label;
+    selectedTime.textContent = timeLabel;
+    document.getElementById('weatherHighLow').textContent =
+        `Cao ${Math.round(weatherData.daily.temperature_2m_max[0])}° · Thấp ${Math.round(weatherData.daily.temperature_2m_min[0])}°`;
+    document.getElementById('weatherLocation').textContent =
+        `Vị trí GPS · ${weatherData.timezone_abbreviation || 'Giờ địa phương'}`;
+    weatherTimeline.style.setProperty('--x', `${(selectedWeatherHour / 23 * 100).toFixed(2)}%`);
+    weatherTimeline.setAttribute('aria-valuenow', String(selectedWeatherHour));
+    weatherTimeline.setAttribute('aria-valuetext', `${timeLabel}, ${temperature} độ C, ${condition.label}`);
+    const localHour = Math.max(0, Math.min(23, Math.round(weatherTimeHour(current.time))));
+    setWeatherStatus(
+        `${selectedWeatherHour === localHour ? `Hiện tại ${current.time.slice(11, 16)}` : `Dự báo ${timeLabel}`}`
+        + `${detail ? ` · ${detail}` : ''} · Cập nhật ${current.time.slice(11, 16)}`
+    );
+    weatherHourLabels.querySelectorAll('.u094-lb').forEach(button => {
+        button.classList.toggle('on', Number(button.dataset.hour) === selectedWeatherHour);
+    });
+}
+
+function createWeatherHourLabels() {
+    const hours = [3, 6, 9, 12, 15, 18, 21];
+    weatherHourLabels.replaceChildren();
+    hours.forEach(hour => {
+        const point = getWeatherPoint(hour);
+        const condition = getWeatherCondition(point.code, point.isDay);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'u094-lb';
+        button.dataset.hour = String(hour);
+        button.style.left = `${hour / 23 * 100}%`;
+        button.setAttribute('aria-label', `${weatherTimeLabel(hour)}, ${Math.round(point.temperature)} độ C, ${condition.label}`);
+        button.innerHTML = `<small>${weatherTimeLabel(hour)}</small><svg viewBox="0 0 22 22" aria-hidden="true">${weatherIconSvg[condition.icon]}</svg><b>${Math.round(point.temperature)}°</b>`;
+        button.addEventListener('click', () => renderWeatherHour(hour));
+        weatherHourLabels.appendChild(button);
+    });
+}
+
+async function loadWeather() {
+    const requestId = ++weatherRequestId;
+    weatherController?.abort();
+    weatherController = new AbortController();
+    weatherRefreshBtn.disabled = true;
+    weatherTimeline.setAttribute('aria-disabled', String(!weatherData));
+    setWeatherStatus('Đang xác định vị trí và tải dự báo...');
+
+    try {
+        if (!navigator.geolocation) {
+            throw new Error('Cần mở trang bằng HTTPS và bật quyền vị trí trong trình duyệt.');
+        }
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 300000
+            });
+        });
+        if (requestId !== weatherRequestId) return;
+
+        const params = new URLSearchParams({
+            latitude: String(position.coords.latitude),
+            longitude: String(position.coords.longitude),
+            current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,wind_speed_10m',
+            hourly: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation_probability,weather_code,cloud_cover,wind_speed_10m',
+            daily: 'temperature_2m_max,temperature_2m_min,sunrise,sunset',
+            timezone: 'auto',
+            forecast_days: '1',
+            models: 'best_match'
+        });
+        const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+            signal: weatherController.signal
+        });
+        if (!response.ok) throw new Error(`Open-Meteo trả về lỗi HTTP ${response.status}.`);
+        const data = await response.json();
+        if (requestId !== weatherRequestId) return;
+        const hourlyFields = [
+            'temperature_2m', 'apparent_temperature', 'relative_humidity_2m', 'is_day',
+            'precipitation_probability', 'weather_code', 'cloud_cover', 'wind_speed_10m'
+        ];
+        const dailyFields = ['temperature_2m_max', 'temperature_2m_min', 'sunrise', 'sunset'];
+        const hasCurrentWeather = [
+            'temperature_2m', 'relative_humidity_2m', 'apparent_temperature',
+            'is_day', 'weather_code', 'cloud_cover', 'wind_speed_10m'
+        ].every(field => data.current?.[field] !== null && data.current?.[field] !== undefined);
+        const hasHourlyWeather = data.hourly?.time?.length
+            && hourlyFields.every(field => data.hourly[field]?.length === data.hourly.time.length);
+        const hasDailyWeather = dailyFields.every(field => data.daily?.[field]?.[0] !== null
+            && data.daily?.[field]?.[0] !== undefined);
+        if (!data.current?.time || !hasCurrentWeather || !hasHourlyWeather || !hasDailyWeather) {
+            throw new Error('Dữ liệu thời tiết trả về không đầy đủ.');
+        }
+        weatherData = data;
+        createWeatherHourLabels();
+        renderWeatherHour(weatherTimeHour(data.current.time));
+        weatherTimeline.setAttribute('aria-disabled', 'false');
+    } catch (error) {
+        if (requestId !== weatherRequestId || error.name === 'AbortError') return;
+        console.warn('Không thể tải thời tiết hiện tại:', error);
+        const message = error.code === 1
+            ? 'Hãy cho phép truy cập vị trí trong trình duyệt để xem thời tiết.'
+            : error.code === 2 || error.code === 3
+                ? 'Không xác định được vị trí. Hãy thử làm mới hoặc kiểm tra GPS.'
+                : error.message || 'Không thể tải dữ liệu thời tiết. Hãy thử lại.';
+        setWeatherStatus(message, true);
+    } finally {
+        if (requestId === weatherRequestId) weatherRefreshBtn.disabled = false;
+    }
+}
+
+function startWeatherUpdates() {
+    clearInterval(weatherRefreshTimer);
+    loadWeather();
+    weatherRefreshTimer = setInterval(loadWeather, 30 * 60 * 1000);
+}
+
+function stopWeatherUpdates() {
+    clearInterval(weatherRefreshTimer);
+    weatherRefreshTimer = null;
+    weatherRequestId++;
+    weatherController?.abort();
+    weatherController = null;
+    weatherRefreshBtn.disabled = false;
+    weatherData = null;
+    weatherRoot.classList.remove('rain');
+    weatherHourLabels.replaceChildren();
+    document.getElementById('weatherLocation').textContent = 'Đang xác định vị trí...';
+    document.getElementById('weatherTemperature').textContent = '--°';
+    document.getElementById('weatherCondition').textContent = 'Đang tải thời tiết';
+    document.getElementById('weatherHighLow').textContent = 'H --° · L --°';
+    document.getElementById('weatherSelectedTime').textContent = '--:--';
+    weatherTimeline.setAttribute('aria-valuenow', '0');
+    weatherTimeline.setAttribute('aria-valuetext', 'Đang tải dữ liệu');
+    weatherTimeline.setAttribute('aria-disabled', 'true');
+    setWeatherStatus('Đang tải thời tiết tại vị trí của bạn...');
+}
+
+weatherRefreshBtn.addEventListener('click', loadWeather);
+weatherTimeline.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || !weatherData) return;
+    event.preventDefault();
+    weatherTimeline.setPointerCapture(event.pointerId);
+    weatherRoot.querySelector('.u094-strip').classList.add('drag');
+    const bounds = weatherTimeline.getBoundingClientRect();
+    renderWeatherHour(Math.max(0, Math.min(23,
+        ((event.clientX - bounds.left) / bounds.width) * 23)));
+});
+weatherTimeline.addEventListener('pointermove', event => {
+    if (!weatherTimeline.hasPointerCapture(event.pointerId)) return;
+    const bounds = weatherTimeline.getBoundingClientRect();
+    renderWeatherHour(Math.max(0, Math.min(23,
+        ((event.clientX - bounds.left) / bounds.width) * 23)));
+});
+function endWeatherScrub() {
+    weatherRoot.querySelector('.u094-strip').classList.remove('drag');
+}
+weatherTimeline.addEventListener('pointerup', endWeatherScrub);
+weatherTimeline.addEventListener('pointercancel', endWeatherScrub);
+weatherTimeline.addEventListener('keydown', event => {
+    let hour = null;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowUp') hour = Math.min(23, selectedWeatherHour + 1);
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') hour = Math.max(0, selectedWeatherHour - 1);
+    else if (event.key === 'Home') hour = 0;
+    else if (event.key === 'End') hour = 23;
+    if (hour === null || !weatherData) return;
+    event.preventDefault();
+    renderWeatherHour(hour);
+});
 
 function getUserAttendanceCollection() {
     if (!currentUser) throw new Error('Chưa đăng nhập');
@@ -2493,6 +3167,42 @@ document.getElementById('status').addEventListener('change', window.updateButton
 const mobileBottomNav = document.getElementById('mobileBottomNav');
 const mobileNavLinks = [...mobileBottomNav.querySelectorAll('[data-nav-target]')];
 let mobileNavObserver = null;
+let mobileNavX = 0;
+let mobileNavVelocity = 0;
+let mobileNavTarget = 0;
+let mobileNavAnimationFrame = 0;
+
+function animateMobileNavIndicator() {
+    const activeLink = mobileNavLinks.find(link => link.getAttribute('aria-current') === 'page');
+    if (!activeLink) return;
+
+    mobileNavTarget = activeLink.parentElement.offsetLeft + activeLink.offsetWidth / 2;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        if (mobileNavAnimationFrame) cancelAnimationFrame(mobileNavAnimationFrame);
+        mobileNavX = mobileNavTarget;
+        mobileNavVelocity = 0;
+        mobileNavAnimationFrame = 0;
+        mobileBottomNav.style.setProperty('--x', `${mobileNavX}px`);
+        return;
+    }
+
+    function step() {
+        const acceleration = (mobileNavTarget - mobileNavX) * 0.16 - mobileNavVelocity * 0.42;
+        mobileNavVelocity += acceleration;
+        mobileNavX += mobileNavVelocity;
+        mobileBottomNav.style.setProperty('--x', `${mobileNavX.toFixed(2)}px`);
+        if (Math.abs(mobileNavTarget - mobileNavX) > 0.3 || Math.abs(mobileNavVelocity) > 0.3) {
+            mobileNavAnimationFrame = requestAnimationFrame(step);
+        } else {
+            mobileNavX = mobileNavTarget;
+            mobileNavVelocity = 0;
+            mobileBottomNav.style.setProperty('--x', `${mobileNavX}px`);
+            mobileNavAnimationFrame = 0;
+        }
+    }
+
+    if (!mobileNavAnimationFrame) mobileNavAnimationFrame = requestAnimationFrame(step);
+}
 
 function setActiveMobileNavLink(activeLink) {
     mobileNavLinks.forEach(link => {
@@ -2502,6 +3212,7 @@ function setActiveMobileNavLink(activeLink) {
             link.removeAttribute('aria-current');
         }
     });
+    animateMobileNavIndicator();
 }
 
 function configureMobileBottomNav(isAdmin) {
@@ -2509,6 +3220,7 @@ function configureMobileBottomNav(isAdmin) {
     const visibleLinks = mobileNavLinks.filter(link => {
         const isVisible = link.dataset.role === role;
         link.classList.toggle('hidden', !isVisible);
+        link.parentElement.classList.toggle('hidden', !isVisible);
         return isVisible;
     });
     mobileBottomNav.classList.remove('hidden');
@@ -2543,12 +3255,29 @@ mobileNavLinks.forEach(link => {
             block: 'start'
         });
     });
+
+    link.addEventListener('keydown', event => {
+        const direction = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+        if (!direction) return;
+        const visibleLinks = mobileNavLinks.filter(item => !item.classList.contains('hidden'));
+        const index = visibleLinks.indexOf(link);
+        if (index < 0) return;
+        event.preventDefault();
+        const nextLink = visibleLinks[(index + direction + visibleLinks.length) % visibleLinks.length];
+        nextLink.focus();
+        nextLink.click();
+    });
 });
+
+window.addEventListener('resize', animateMobileNavIndicator);
 
 onAuthStateChanged(auth, async (user) => {
     showPageLoader(user ? 'Đang tải dữ liệu tài khoản...' : 'Đang kiểm tra phiên đăng nhập...');
     currentUser = user;
     if (!user) {
+        stopWeatherUpdates();
+        profileEditorModal.classList.add('hidden');
+        updateUserAvatar('U', '');
         mobileBottomNav.classList.add('hidden');
         mobileNavObserver?.disconnect();
         resetLoginForm();
@@ -2586,9 +3315,10 @@ onAuthStateChanged(auth, async (user) => {
         const displayNameInput = document.getElementById('displayNameInput');
         if (displayNameInput) displayNameInput.value = profile.displayName || user.displayName || '';
         document.getElementById('userDisplayName').textContent = `Xin chào, ${displayName}`;
-        updateUserAvatar(displayName);
+        updateUserAvatar(displayName, profile.photoData || '');
         const roleLabel = document.getElementById('userRoleLabel');
         if (roleLabel) roleLabel.textContent = isAdmin ? 'Quản trị viên' : (profile.role || 'Nhân viên');
+        startWeatherUpdates();
         if (isAdmin) {
             await loadEmployees();
         } else {
@@ -2597,6 +3327,7 @@ onAuthStateChanged(auth, async (user) => {
         }
     } catch (error) {
         console.error(error);
+        stopWeatherUpdates();
         mobileBottomNav.classList.add('hidden');
         mobileNavObserver?.disconnect();
         appScreen.classList.add('hidden');
